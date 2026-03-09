@@ -8,9 +8,10 @@ from dbt_mcp.config.config import (
     DbtMcpSettings,
     load_config,
 )
-from dbt_mcp.config.settings import DEFAULT_DBT_CLI_TIMEOUT
+from dbt_mcp.config.settings import DEFAULT_DBT_CLI_TIMEOUT, DEFAULT_MF_CLI_TIMEOUT
 from dbt_mcp.dbt_cli.binary_type import BinaryType
 from dbt_mcp.tools.tool_names import ToolName
+from tests.env_vars import get_env_value
 
 
 class TestDbtMcpSettings:
@@ -19,16 +20,24 @@ class TestDbtMcpSettings:
         env_vars_to_clear = [
             "DBT_HOST",
             "DBT_MCP_HOST",
+            "FASTMCP_HOST",
+            "FASTMCP_PORT",
+            "MCP_TRANSPORT",
+            "DBT_MCP_API_KEY",
             "DBT_PROD_ENV_ID",
             "DBT_ENV_ID",
             "DBT_DEV_ENV_ID",
             "DBT_USER_ID",
             "DBT_TOKEN",
-            "DBT_PROJECT_DIR",
+            "DBT_PROJECT_ROOT_DIR",
             "DBT_PATH",
             "DBT_CLI_TIMEOUT",
+            "MF_PATH",
+            "MF_CLI_TIMEOUT",
             "DISABLE_DBT_CLI",
             "DISABLE_DBT_CODEGEN",
+            "DISABLE_METRICFLOW_CLI",
+            "DISABLE_METRICFLOW_PROJECT_FILES",
             "DISABLE_SEMANTIC_LAYER",
             "DISABLE_DISCOVERY",
             "DISABLE_REMOTE",
@@ -38,6 +47,8 @@ class TestDbtMcpSettings:
             "DBT_WARN_ERROR_OPTIONS",
             "DISABLE_TOOLS",
             "DBT_ACCOUNT_ID",
+            "DBT_MCP_ENABLE_METRICFLOW_CLI",
+            "DBT_MCP_ENABLE_METRICFLOW_PROJECT_FILES",
         ]
         for var in env_vars_to_clear:
             os.environ.pop(var, None)
@@ -49,11 +60,21 @@ class TestDbtMcpSettings:
         }  # Keep HOME for potential path resolution
         with env_setup(env_vars=clean_env):
             settings = DbtMcpSettings(_env_file=None)
-            assert settings.dbt_path == "dbt"
+            assert settings.dbt_path == get_env_value("DBT_PATH", "dbt")
             assert settings.dbt_cli_timeout == DEFAULT_DBT_CLI_TIMEOUT
+            assert settings.mf_path == get_env_value("MF_PATH", "mf")
+            assert settings.mf_cli_timeout == DEFAULT_MF_CLI_TIMEOUT
+            assert settings.mcp_server_host == "127.0.0.1"
+            assert settings.mcp_server_port == 8000
+            assert settings.mcp_transport is None
+            assert settings.mcp_api_key is None
             assert settings.disable_remote is None, "disable_remote"
             assert settings.disable_dbt_cli is False, "disable_dbt_cli"
             assert settings.disable_dbt_codegen is True, "disable_dbt_codegen"
+            assert settings.disable_metricflow_cli is False, "disable_metricflow_cli"
+            assert (
+                settings.disable_metricflow_project_files is False
+            ), "disable_metricflow_project_files"
             assert settings.disable_admin_api is False, "disable_admin_api"
             assert settings.disable_semantic_layer is False, "disable_semantic_layer"
             assert settings.disable_discovery is False, "disable_discovery"
@@ -70,8 +91,12 @@ class TestDbtMcpSettings:
             settings = DbtMcpSettings(_env_file=None)
             assert settings.usage_tracking_enabled is False
 
-    def test_usage_tracking_respects_dbt_project_yaml(self, env_setup):
-        with env_setup() as (project_dir, helpers):
+    def test_usage_tracking_respects_dbt_project_yaml(self, env_setup, tmp_path):
+        isolated_root = tmp_path / "dbt_projects"
+        with env_setup(env_vars={"DBT_PROJECT_ROOT_DIR": str(isolated_root)}) as (
+            project_dir,
+            helpers,
+        ):
             (project_dir / "dbt_project.yml").write_text(
                 "flags:\n  send_anonymous_usage_stats: false\n"
             )
@@ -120,7 +145,13 @@ class TestDbtMcpSettings:
             "DBT_HOST": "test.dbt.com",
             "DBT_PROD_ENV_ID": "123",
             "DBT_TOKEN": "test_token",
+            "FASTMCP_HOST": "0.0.0.0",
+            "FASTMCP_PORT": "9000",
+            "MCP_TRANSPORT": "streamable-http",
+            "DBT_MCP_API_KEY": "test_api_key",
             "DISABLE_DBT_CLI": "true",
+            "DISABLE_METRICFLOW_CLI": "true",
+            "DISABLE_METRICFLOW_PROJECT_FILES": "true",
             "DISABLE_TOOLS": "build,compile,docs",
         }
 
@@ -129,8 +160,14 @@ class TestDbtMcpSettings:
             assert settings.dbt_host == "test.dbt.com"
             assert settings.dbt_prod_env_id == 123
             assert settings.dbt_token == "test_token"
-            assert settings.dbt_project_dir == str(project_dir)
+            assert settings.mcp_server_host == "0.0.0.0"
+            assert settings.mcp_server_port == 9000
+            assert settings.mcp_transport == "streamable-http"
+            assert settings.mcp_api_key == "test_api_key"
+            assert settings.dbt_project_root_dir == str(project_dir.parent)
             assert settings.disable_dbt_cli is True
+            assert settings.disable_metricflow_cli is True
+            assert settings.disable_metricflow_project_files is True
             assert settings.disable_tools == [
                 ToolName.BUILD,
                 ToolName.COMPILE,
@@ -235,12 +272,16 @@ class TestLoadConfig:
         env_vars_to_clear = [
             "DBT_HOST",
             "DBT_MCP_HOST",
+            "FASTMCP_HOST",
+            "FASTMCP_PORT",
+            "MCP_TRANSPORT",
+            "DBT_MCP_API_KEY",
             "DBT_PROD_ENV_ID",
             "DBT_ENV_ID",
             "DBT_DEV_ENV_ID",
             "DBT_USER_ID",
             "DBT_TOKEN",
-            "DBT_PROJECT_DIR",
+            "DBT_PROJECT_ROOT_DIR",
             "DBT_PATH",
             "DBT_CLI_TIMEOUT",
             "DISABLE_DBT_CLI",
@@ -307,6 +348,9 @@ class TestLoadConfig:
             )
             assert config.dbt_codegen_config is not None, (
                 "dbt_codegen_config should be set"
+            )
+            assert config.metricflow_config is not None, (
+                "metricflow_config should be set"
             )
 
     def test_valid_config_all_services_disabled(self):
@@ -487,3 +531,23 @@ class TestLoadConfig:
         config = self._load_config_with_env(env_vars)
         assert config.discovery_config_provider is not None
         assert config.credentials_provider is not None
+
+    def test_mcp_server_config_from_fastmcp_env(self):
+        env_vars = {
+            "FASTMCP_HOST": "0.0.0.0",
+            "FASTMCP_PORT": "9001",
+            "MCP_TRANSPORT": "streamable-http",
+        }
+
+        config = self._load_config_with_env(env_vars)
+        assert config.mcp_server_config.host == "0.0.0.0"
+        assert config.mcp_server_config.port == 9001
+        assert config.mcp_server_config.transport == "streamable-http"
+
+    def test_mcp_transport_fallback_to_mcp_transport_env(self):
+        env_vars = {
+            "MCP_TRANSPORT": "sse",
+        }
+
+        config = self._load_config_with_env(env_vars)
+        assert config.mcp_server_config.transport == "sse"

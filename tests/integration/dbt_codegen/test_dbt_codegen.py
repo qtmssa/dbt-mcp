@@ -18,21 +18,26 @@ def dbt_codegen_config():
         pass
 
     # Fall back to environment variables
-    project_dir = os.getenv("DBT_PROJECT_DIR")
+    project_root_dir = os.getenv("DBT_PROJECT_ROOT_DIR")
     dbt_path = os.getenv("DBT_PATH", "dbt")
     dbt_cli_timeout = os.getenv("DBT_CLI_TIMEOUT", "30")
 
-    if not project_dir:
+    if not project_root_dir:
         pytest.skip(
-            "DBT_PROJECT_DIR environment variable is required for integration tests"
+            "DBT_PROJECT_ROOT_DIR environment variable is required for integration tests"
         )
 
     return DbtCodegenConfig(
-        project_dir=project_dir,
+        project_root_dir=project_root_dir,
         dbt_path=dbt_path,
         dbt_cli_timeout=int(dbt_cli_timeout),
         binary_type=BinaryType.DBT_CORE,
     )
+
+
+@pytest.fixture
+def project_path():
+    return os.getenv("DBT_PROJECT_PATH", ".")
 
 
 @pytest.fixture
@@ -65,11 +70,14 @@ def generate_staging_model_tool(dbt_codegen_config):
     raise ValueError("generate_staging_model tool not found")
 
 
-def test_generate_source_basic(generate_source_tool):
+def test_generate_source_basic(generate_source_tool, project_path):
     """Test basic source generation with minimal parameters."""
     # This will fail if dbt-codegen is not installed
     result = generate_source_tool(
-        schema_name="public", generate_columns=False, include_descriptions=False
+        project_path=project_path,
+        schema_name="public",
+        generate_columns=False,
+        include_descriptions=False,
     )
 
     # Check for error conditions
@@ -84,10 +92,13 @@ def test_generate_source_basic(generate_source_tool):
     assert len(result) > 0
 
 
-def test_generate_source_with_columns(generate_source_tool):
+def test_generate_source_with_columns(generate_source_tool, project_path):
     """Test source generation with column definitions."""
     result = generate_source_tool(
-        schema_name="public", generate_columns=True, include_descriptions=True
+        project_path=project_path,
+        schema_name="public",
+        generate_columns=True,
+        include_descriptions=True,
     )
 
     if "Error:" in result:
@@ -99,9 +110,10 @@ def test_generate_source_with_columns(generate_source_tool):
     assert result is not None
 
 
-def test_generate_source_with_specific_tables(generate_source_tool):
+def test_generate_source_with_specific_tables(generate_source_tool, project_path):
     """Test source generation for specific tables."""
     result = generate_source_tool(
+        project_path=project_path,
         schema_name="public",
         table_names=["users", "orders"],
         generate_columns=True,
@@ -115,10 +127,11 @@ def test_generate_source_with_specific_tables(generate_source_tool):
     assert result is not None
 
 
-def test_generate_model_yaml(generate_model_yaml_tool):
+def test_generate_model_yaml(generate_model_yaml_tool, project_path):
     """Test model YAML generation."""
     # This assumes there's at least one model in the project
     result = generate_model_yaml_tool(
+        project_path=project_path,
         model_names=["stg_customers"],
         upstream_descriptions=False,
         include_data_types=True,
@@ -133,9 +146,10 @@ def test_generate_model_yaml(generate_model_yaml_tool):
     assert result is not None
 
 
-def test_generate_model_yaml_with_upstream(generate_model_yaml_tool):
+def test_generate_model_yaml_with_upstream(generate_model_yaml_tool, project_path):
     """Test model YAML generation with upstream descriptions."""
     result = generate_model_yaml_tool(
+        project_path=project_path,
         model_names=["stg_customers"],
         upstream_descriptions=True,
         include_data_types=True,
@@ -150,10 +164,11 @@ def test_generate_model_yaml_with_upstream(generate_model_yaml_tool):
     assert result is not None
 
 
-def test_generate_staging_model(generate_staging_model_tool):
+def test_generate_staging_model(generate_staging_model_tool, project_path):
     """Test staging model SQL generation."""
     # This assumes a source is defined
     result = generate_staging_model_tool(
+        project_path=project_path,
         source_name="raw",  # Common source name
         table_name="customers",
         leading_commas=False,
@@ -170,9 +185,12 @@ def test_generate_staging_model(generate_staging_model_tool):
     assert result is not None
 
 
-def test_generate_staging_model_with_case_sensitive(generate_staging_model_tool):
+def test_generate_staging_model_with_case_sensitive(
+    generate_staging_model_tool, project_path
+):
     """Test staging model generation with case-sensitive columns."""
     result = generate_staging_model_tool(
+        project_path=project_path,
         source_name="raw",
         table_name="customers",
         case_sensitive_cols=True,
@@ -188,10 +206,11 @@ def test_generate_staging_model_with_case_sensitive(generate_staging_model_tool)
     assert result is not None
 
 
-def test_error_handling_invalid_schema(generate_source_tool):
+def test_error_handling_invalid_schema(generate_source_tool, project_path):
     """Test handling of invalid schema names."""
     # Use a schema that definitely doesn't exist
     result = generate_source_tool(
+        project_path=project_path,
         schema_name="definitely_nonexistent_schema_12345",
         generate_columns=False,
         include_descriptions=False,
@@ -204,10 +223,11 @@ def test_error_handling_invalid_schema(generate_source_tool):
     assert result is not None
 
 
-def test_error_handling_invalid_model(generate_model_yaml_tool):
+def test_error_handling_invalid_model(generate_model_yaml_tool, project_path):
     """Test handling of non-existent model names."""
     result = generate_model_yaml_tool(
-        model_names=["definitely_nonexistent_model_12345"]
+        project_path=project_path,
+        model_names=["definitely_nonexistent_model_12345"],
     )
 
     if "dbt-codegen package may not be installed" in result:
@@ -217,10 +237,12 @@ def test_error_handling_invalid_model(generate_model_yaml_tool):
     assert result is not None
 
 
-def test_error_handling_invalid_source(generate_staging_model_tool):
+def test_error_handling_invalid_source(generate_staging_model_tool, project_path):
     """Test handling of invalid source references."""
     result = generate_staging_model_tool(
-        source_name="nonexistent_source", table_name="nonexistent_table"
+        project_path=project_path,
+        source_name="nonexistent_source",
+        table_name="nonexistent_table",
     )
 
     if "dbt-codegen package may not be installed" in result:

@@ -1,4 +1,7 @@
+import shutil
 import unittest
+import uuid
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from dbt_mcp.dbt_cli.tools import register_dbt_cli_tools
@@ -30,33 +33,41 @@ class TestDbtCliIntegration(unittest.TestCase):
             disabled_toolsets=set(),
         )
 
+        # Ensure project directory exists under the configured root
+        root_dir = Path(mock_config.dbt_cli_config.project_root_dir)
+        project_path = f"test_project_{uuid.uuid4().hex}"
+        project_dir = root_dir / project_path
+        project_dir.mkdir(parents=True, exist_ok=True)
+
+        dbt_path = mock_config.dbt_cli_config.dbt_path
+
         # Test cases for different command types
         test_cases = [
             # Command name, args, expected command list
-            ("build", [], ["/path/to/dbt", "--no-use-colors", "build", "--quiet"]),
+            ("build", {}, [dbt_path, "--no-use-colors", "build", "--quiet"]),
             (
                 "compile",
-                [],
-                ["/path/to/dbt", "--no-use-colors", "compile", "--quiet"],
+                {},
+                [dbt_path, "--no-use-colors", "compile", "--quiet"],
             ),
             (
                 "docs",
-                [],
-                ["/path/to/dbt", "--no-use-colors", "docs", "--quiet", "generate"],
+                {},
+                [dbt_path, "--no-use-colors", "docs", "--quiet", "generate"],
             ),
             (
                 "ls",
-                [],
-                ["/path/to/dbt", "--no-use-colors", "list", "--quiet"],
+                {},
+                [dbt_path, "--no-use-colors", "list", "--quiet"],
             ),
-            ("parse", [], ["/path/to/dbt", "--no-use-colors", "parse", "--quiet"]),
-            ("run", [], ["/path/to/dbt", "--no-use-colors", "run", "--quiet"]),
-            ("test", [], ["/path/to/dbt", "--no-use-colors", "test", "--quiet"]),
+            ("parse", {}, [dbt_path, "--no-use-colors", "parse", "--quiet"]),
+            ("run", {}, [dbt_path, "--no-use-colors", "run", "--quiet"]),
+            ("test", {}, [dbt_path, "--no-use-colors", "test", "--quiet"]),
             (
                 "show",
-                ["SELECT * FROM model"],
+                {"sql_query": "SELECT * FROM model"},
                 [
-                    "/path/to/dbt",
+                    dbt_path,
                     "--no-use-colors",
                     "show",
                     "--inline",
@@ -68,9 +79,9 @@ class TestDbtCliIntegration(unittest.TestCase):
             ),
             (
                 "show",
-                ["SELECT * FROM model", 10],
+                {"sql_query": "SELECT * FROM model", "limit": 10},
                 [
-                    "/path/to/dbt",
+                    dbt_path,
                     "--no-use-colors",
                     "show",
                     "--inline",
@@ -85,11 +96,13 @@ class TestDbtCliIntegration(unittest.TestCase):
         ]
 
         # Run each test case
-        for command_name, args, expected_args in test_cases:
+        for command_name, kwargs, expected_args in test_cases:
             mock_popen.reset_mock()
 
             # Call the function
-            result = mock_fastmcp.tools[command_name](*args)
+            result = mock_fastmcp.tools[command_name](
+                project_path=project_path, **kwargs
+            )
 
             # Verify the command was called correctly
             mock_popen.assert_called_once()
@@ -100,10 +113,14 @@ class TestDbtCliIntegration(unittest.TestCase):
             self.assertEqual(actual_args[:num_params], expected_args[:num_params])
 
             # Verify correct working directory
-            self.assertEqual(mock_popen.call_args.kwargs.get("cwd"), "/test/project")
+            self.assertEqual(
+                mock_popen.call_args.kwargs.get("cwd"), str(project_dir)
+            )
 
             # Verify the output is returned correctly
             self.assertEqual(result, "command output")
+
+        shutil.rmtree(project_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":

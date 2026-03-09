@@ -8,9 +8,11 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from dbt_mcp.lsp.providers.lsp_client_provider import LSPClientProvider
+from dbt_mcp.project_paths import resolve_project_dir
 from dbt_mcp.prompts.prompts import get_prompt
 from dbt_mcp.tools.annotations import create_tool_annotations
 from dbt_mcp.tools.definitions import ToolDefinition
+from dbt_mcp.tools.fields import PROJECT_PATH_FIELD
 from dbt_mcp.tools.register import register_tools
 from dbt_mcp.tools.tool_names import ToolName
 from dbt_mcp.tools.toolsets import Toolset
@@ -21,6 +23,7 @@ logger = logging.getLogger(__name__)
 async def register_lsp_tools(
     server: FastMCP,
     lspClientProvider: LSPClientProvider,
+    project_root_dir: str,
     *,
     disabled_tools: set[ToolName],
     enabled_tools: set[ToolName] | None,
@@ -29,7 +32,7 @@ async def register_lsp_tools(
 ) -> None:
     register_tools(
         dbt_mcp=server,
-        tool_definitions=await list_lsp_tools(lspClientProvider),
+        tool_definitions=await list_lsp_tools(lspClientProvider, project_root_dir),
         disabled_tools=disabled_tools,
         enabled_tools=enabled_tools,
         enabled_toolsets=enabled_toolsets,
@@ -39,6 +42,7 @@ async def register_lsp_tools(
 
 async def list_lsp_tools(
     lspClientProvider: LSPClientProvider,
+    project_root_dir: str,
 ) -> list[ToolDefinition]:
     """Register dbt Fusion tools with the MCP server.
 
@@ -54,14 +58,14 @@ async def list_lsp_tools(
 
         @functools.wraps(func)
         async def wrapper(*args, **kwargs) -> Any:
-            return await func(lspClientProvider, *args, **kwargs)
+            return await func(lspClientProvider, project_root_dir, *args, **kwargs)
 
         # remove the lsp_client argument from the signature
         wrapper.__signature__ = inspect.signature(func).replace(  # type: ignore
             parameters=[
                 param
                 for param in inspect.signature(func).parameters.values()
-                if param.name != "lsp_client_provider"
+                if param.name not in ("lsp_client_provider", "project_root_dir")
             ]
         )
 
@@ -83,6 +87,8 @@ async def list_lsp_tools(
 
 async def get_column_lineage(
     lsp_client_provider: LSPClientProvider,
+    project_root_dir: str,
+    project_path: str = PROJECT_PATH_FIELD,
     model_id: str = Field(description=get_prompt("lsp/args/model_id")),
     column_name: str = Field(description=get_prompt("lsp/args/column_name")),
 ) -> dict[str, Any]:
@@ -99,7 +105,8 @@ async def get_column_lineage(
         - 'error' key containing error message on failure
     """
     try:
-        lsp_client = await lsp_client_provider.get_client()
+        project_dir = resolve_project_dir(project_root_dir, project_path)
+        lsp_client = await lsp_client_provider.get_client(str(project_dir))
         response = await lsp_client.get_column_lineage(
             model_id=model_id,
             column_name=column_name,

@@ -19,6 +19,8 @@ class Toolset(Enum):
     ADMIN_API = "admin_api"
     DBT_CODEGEN = "dbt_codegen"
     DBT_LSP = "dbt_lsp"
+    METRICFLOW_CLI = "metricflow_cli"
+    METRICFLOW_PROJECT_FILES = "metricflow_project_files"
     MCP_SERVER_METADATA = "mcp_server_metadata"
 
 
@@ -86,6 +88,7 @@ toolsets = {
         ToolName.RUN,
         ToolName.TEST,
         ToolName.SHOW,
+        ToolName.EXECUTE_DBT_CMD,
         ToolName.GET_LINEAGE_DEV,
         ToolName.GET_NODE_DETAILS_DEV,
     },
@@ -106,6 +109,20 @@ toolsets = {
         ToolName.GENERATE_SOURCE,
         ToolName.GENERATE_MODEL_YAML,
         ToolName.GENERATE_STAGING_MODEL,
+    },
+    Toolset.METRICFLOW_CLI: {
+        ToolName.MF_HEALTH_CHECKS,
+        ToolName.MF_LIST,
+        ToolName.MF_QUERY,
+        ToolName.MF_TUTORIAL,
+        ToolName.MF_VALIDATE_CONFIGS,
+        ToolName.EXECUTE_MF_CMD,
+    },
+    Toolset.METRICFLOW_PROJECT_FILES: {
+        ToolName.LIST_PROJECTS,
+        ToolName.IS_PROJECT_EXIST,
+        ToolName.UPLOAD_PROJECT_ZIP_URL,
+        ToolName.DELETE_PROJECT,
     },
     Toolset.DBT_LSP: {
         ToolName.GET_COLUMN_LINEAGE,

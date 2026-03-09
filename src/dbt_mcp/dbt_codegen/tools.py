@@ -1,5 +1,4 @@
 import json
-import os
 import subprocess
 from typing import Any
 
@@ -9,8 +8,10 @@ from pydantic import Field
 from dbt_mcp.config.config import DbtCodegenConfig
 from dbt_mcp.dbt_cli.binary_type import get_color_disable_flag
 from dbt_mcp.prompts.prompts import get_prompt
+from dbt_mcp.project_paths import resolve_project_dir
 from dbt_mcp.tools.annotations import create_tool_annotations
 from dbt_mcp.tools.definitions import ToolDefinition
+from dbt_mcp.tools.fields import PROJECT_PATH_FIELD
 from dbt_mcp.tools.register import register_tools
 from dbt_mcp.tools.tool_names import ToolName
 from dbt_mcp.tools.toolsets import Toolset
@@ -21,6 +22,7 @@ def create_dbt_codegen_tool_definitions(
 ) -> list[ToolDefinition]:
     def _run_codegen_operation(
         macro_name: str,
+        project_path: str,
         args: dict[str, Any] | None = None,
     ) -> str:
         """Execute a dbt-codegen macro using dbt run-operation."""
@@ -40,10 +42,11 @@ def create_dbt_codegen_tool_definitions(
             command_args = full_command[1:] if len(full_command) > 1 else []
             full_command = [main_command, "--quiet", *command_args]
 
-            # We change the path only if this is an absolute path, otherwise we can have
-            # problems with relative paths applied multiple times as DBT_PROJECT_DIR
-            # is applied to dbt Core and Fusion as well (but not the dbt Cloud CLI)
-            cwd_path = config.project_dir if os.path.isabs(config.project_dir) else None
+            project_dir = resolve_project_dir(
+                config.project_root_dir,
+                project_path,
+            )
+            cwd_path = str(project_dir)
 
             # Add appropriate color disable flag based on binary type
             color_flag = get_color_disable_flag(config.binary_type)
@@ -73,6 +76,7 @@ def create_dbt_codegen_tool_definitions(
             return str(e)
 
     def generate_source(
+        project_path: str = PROJECT_PATH_FIELD,
         schema_name: str = Field(
             description=get_prompt("dbt_codegen/args/schema_name")
         ),
@@ -98,9 +102,10 @@ def create_dbt_codegen_tool_definitions(
         args["generate_columns"] = generate_columns
         args["include_descriptions"] = include_descriptions
 
-        return _run_codegen_operation("generate_source", args)
+        return _run_codegen_operation("generate_source", project_path, args)
 
     def generate_model_yaml(
+        project_path: str = PROJECT_PATH_FIELD,
         model_names: list[str] = Field(
             description=get_prompt("dbt_codegen/args/model_names")
         ),
@@ -118,9 +123,10 @@ def create_dbt_codegen_tool_definitions(
             "include_data_types": include_data_types,
         }
 
-        return _run_codegen_operation("generate_model_yaml", args)
+        return _run_codegen_operation("generate_model_yaml", project_path, args)
 
     def generate_staging_model(
+        project_path: str = PROJECT_PATH_FIELD,
         source_name: str = Field(
             description=get_prompt("dbt_codegen/args/source_name")
         ),
@@ -145,7 +151,7 @@ def create_dbt_codegen_tool_definitions(
         if materialized:
             args["materialized"] = materialized
 
-        return _run_codegen_operation("generate_base_model", args)
+        return _run_codegen_operation("generate_base_model", project_path, args)
 
     return [
         ToolDefinition(

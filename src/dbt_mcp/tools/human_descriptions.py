@@ -12,6 +12,7 @@ HUMAN_DESCRIPTIONS: dict[ToolName, str] = {
     ToolName.RUN: "Executes models to materialize them in the database.",
     ToolName.TEST: "Runs tests to validate data and model integrity.",
     ToolName.SHOW: "Executes SQL against the database and returns results.",
+    ToolName.EXECUTE_DBT_CMD: "Executes an arbitrary dbt CLI command with explicit arguments.",
     ToolName.GET_LINEAGE_DEV: "Retrieves lineage from local manifest.json with type and depth filtering.",
     ToolName.GET_NODE_DETAILS_DEV: "Retrieves node details from local manifest.json (models, seeds, snapshots, sources).",
     # Semantic Layer tools
@@ -61,6 +62,17 @@ HUMAN_DESCRIPTIONS: dict[ToolName, str] = {
     ToolName.GENERATE_SOURCE: "Generates source YAML by introspecting database schemas; option to include columns.",
     ToolName.GENERATE_MODEL_YAML: "Generates model YAML with columns; option to inherit upstream descriptions.",
     ToolName.GENERATE_STAGING_MODEL: "Generates staging model SQL from a source table.",
+    # MetricFlow CLI tools
+    ToolName.MF_HEALTH_CHECKS: "Performs MetricFlow health checks against the configured data warehouse.",
+    ToolName.MF_LIST: "Lists MetricFlow resources and metadata.",
+    ToolName.MF_QUERY: "Runs a MetricFlow query to assemble and execute metric SQL.",
+    ToolName.MF_TUTORIAL: "Runs the MetricFlow tutorial workflow.",
+    ToolName.MF_VALIDATE_CONFIGS: "Validates MetricFlow configuration and model definitions.",
+    ToolName.EXECUTE_MF_CMD: "Executes an arbitrary MetricFlow CLI command with explicit arguments.",
+    ToolName.LIST_PROJECTS: "Lists available project directories under DBT_PROJECT_ROOT_DIR.",
+    ToolName.IS_PROJECT_EXIST: "Checks whether a project exists under DBT_PROJECT_ROOT_DIR.",
+    ToolName.UPLOAD_PROJECT_ZIP_URL: "Downloads a project ZIP from a URL into DBT_PROJECT_ROOT_DIR.",
+    ToolName.DELETE_PROJECT: "Deletes a project directory under DBT_PROJECT_ROOT_DIR.",
     # dbt LSP tools
     ToolName.GET_COLUMN_LINEAGE: "Traces column-level lineage locally (requires dbt-lsp via dbt Labs VSCE).",
     ToolName.FUSION_COMPILE_SQL: "Compiles SQL in project context via dbt Platform.",

@@ -12,10 +12,12 @@ from dbt_mcp.dbt_cli.binary_type import get_color_disable_flag
 from dbt_mcp.dbt_cli.models.lineage_types import ModelLineage
 from dbt_mcp.dbt_cli.models.manifest import Manifest
 from dbt_mcp.prompts.prompts import get_prompt
+from dbt_mcp.project_paths import resolve_project_dir
 from dbt_mcp.tools.annotations import create_tool_annotations
 from dbt_mcp.tools.definitions import ToolDefinition
 from dbt_mcp.tools.fields import (
     DEPTH_FIELD,
+    PROJECT_PATH_FIELD,
     TYPES_FIELD,
     UNIQUE_ID_REQUIRED_FIELD,
 )
@@ -28,6 +30,7 @@ from dbt_mcp.tools.toolsets import Toolset
 def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition]:
     def _run_dbt_command(
         command: list[str],
+        project_path: str,
         selector: str | None = None,
         resource_type: list[str] | None = None,
         is_selectable: bool = False,
@@ -66,10 +69,11 @@ def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition
                 command_args = full_command[1:] if len(full_command) > 1 else []
                 full_command = [main_command, "--quiet", *command_args]
 
-            # We change the path only if this is an absolute path, otherwise we can have
-            # problems with relative paths applied multiple times as DBT_PROJECT_DIR
-            # is applied to dbt Core and Fusion as well (but not the dbt Cloud CLI)
-            cwd_path = config.project_dir if os.path.isabs(config.project_dir) else None
+            project_dir = resolve_project_dir(
+                config.project_root_dir,
+                project_path,
+            )
+            cwd_path = str(project_dir)
 
             # Add appropriate color disable flag based on binary type
             color_flag = get_color_disable_flag(config.binary_type)
@@ -92,7 +96,35 @@ def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition
                 else ""
             )
 
+    def _run_dbt_raw_command(
+        command_args: list[str],
+        project_path: str,
+    ) -> str:
+        try:
+            project_dir = resolve_project_dir(
+                config.project_root_dir,
+                project_path,
+            )
+            cwd_path = str(project_dir)
+
+            color_flag = get_color_disable_flag(config.binary_type)
+            args = [config.dbt_path, color_flag, *command_args]
+
+            process = subprocess.Popen(
+                args=args,
+                cwd=cwd_path,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+                text=True,
+            )
+            output, _ = process.communicate(timeout=config.dbt_cli_timeout)
+            return output or "OK"
+        except subprocess.TimeoutExpired:
+            return "Timeout: dbt command took too long to complete."
+
     def build(
+        project_path: str = PROJECT_PATH_FIELD,
         selector: str | None = Field(
             default=None, description=get_prompt("dbt_cli/args/selectors")
         ),
@@ -105,19 +137,25 @@ def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition
     ) -> str:
         return _run_dbt_command(
             ["build"],
+            project_path,
             selector,
             is_selectable=True,
             is_full_refresh=is_full_refresh,
             vars=vars,
         )
 
-    def compile() -> str:
-        return _run_dbt_command(["compile"])
+    def compile(
+        project_path: str = PROJECT_PATH_FIELD,
+    ) -> str:
+        return _run_dbt_command(["compile"], project_path)
 
-    def docs() -> str:
-        return _run_dbt_command(["docs", "generate"])
+    def docs(
+        project_path: str = PROJECT_PATH_FIELD,
+    ) -> str:
+        return _run_dbt_command(["docs", "generate"], project_path)
 
     def ls(
+        project_path: str = PROJECT_PATH_FIELD,
         selector: str | None = Field(
             default=None, description=get_prompt("dbt_cli/args/selectors")
         ),
@@ -128,15 +166,19 @@ def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition
     ) -> str:
         return _run_dbt_command(
             ["list"],
+            project_path,
             selector,
             resource_type=resource_type,
             is_selectable=True,
         )
 
-    def parse() -> str:
-        return _run_dbt_command(["parse"])
+    def parse(
+        project_path: str = PROJECT_PATH_FIELD,
+    ) -> str:
+        return _run_dbt_command(["parse"], project_path)
 
     def run(
+        project_path: str = PROJECT_PATH_FIELD,
         selector: str | None = Field(
             default=None, description=get_prompt("dbt_cli/args/selectors")
         ),
@@ -149,6 +191,7 @@ def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition
     ) -> str:
         return _run_dbt_command(
             ["run"],
+            project_path,
             selector,
             is_selectable=True,
             is_full_refresh=is_full_refresh,
@@ -156,6 +199,7 @@ def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition
         )
 
     def test(
+        project_path: str = PROJECT_PATH_FIELD,
         selector: str | None = Field(
             default=None, description=get_prompt("dbt_cli/args/selectors")
         ),
@@ -163,9 +207,16 @@ def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition
             default=None, description=get_prompt("dbt_cli/args/vars")
         ),
     ) -> str:
-        return _run_dbt_command(["test"], selector, is_selectable=True, vars=vars)
+        return _run_dbt_command(
+            ["test"],
+            project_path,
+            selector,
+            is_selectable=True,
+            vars=vars,
+        )
 
     def show(
+        project_path: str = PROJECT_PATH_FIELD,
         sql_query: str = Field(description=get_prompt("dbt_cli/args/sql_query")),
         limit: int = Field(default=5, description=get_prompt("dbt_cli/args/limit")),
     ) -> str:
@@ -185,23 +236,35 @@ def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition
         if cli_limit is not None:
             args.extend(["--limit", str(cli_limit)])
         args.extend(["--output", "json"])
-        return _run_dbt_command(args)
+        return _run_dbt_command(args, project_path)
 
-    def _get_manifest() -> Manifest:
+    def execute_dbt_cmd(
+        project_path: str = PROJECT_PATH_FIELD,
+        command_args: list[str] = Field(
+            description=get_prompt("dbt_cli/args/command_args")
+        ),
+    ) -> str:
+        return _run_dbt_raw_command(command_args, project_path)
+
+    def _get_manifest(project_path: str) -> Manifest:
         """Helper function to load the dbt manifest.json file."""
-        _run_dbt_command(["parse"])  # Ensure manifest is generated
-        cwd_path = config.project_dir if os.path.isabs(config.project_dir) else None
-        manifest_path = os.path.join(cwd_path or ".", "target", "manifest.json")
+        _run_dbt_command(["parse"], project_path)  # Ensure manifest is generated
+        project_dir = resolve_project_dir(
+            config.project_root_dir,
+            project_path,
+        )
+        manifest_path = os.path.join(str(project_dir), "target", "manifest.json")
         with open(manifest_path) as f:
             manifest_data = json.load(f)
         return Manifest(**manifest_data)
 
     def get_lineage_dev(
+        project_path: str = PROJECT_PATH_FIELD,
         unique_id: str = UNIQUE_ID_REQUIRED_FIELD,
         types: list[LineageResourceType] | None = TYPES_FIELD,
         depth: int = DEPTH_FIELD,
     ) -> dict[str, Any]:
-        manifest = _get_manifest()
+        manifest = _get_manifest(project_path)
         model_lineage = ModelLineage.from_manifest(
             manifest,
             unique_id=unique_id,
@@ -211,6 +274,7 @@ def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition
         return model_lineage.model_dump()
 
     def get_node_details_dev(
+        project_path: str = PROJECT_PATH_FIELD,
         node_id: str = Field(
             description=get_prompt("dbt_cli/args/node_id"),
         ),
@@ -259,6 +323,7 @@ def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition
         ]
         output = _run_dbt_command(
             ["list", "--output", "json", "--output-keys", *output_keys],
+            project_path,
             selector=node_id,
             is_selectable=True,
         )
@@ -371,6 +436,16 @@ def create_dbt_cli_tool_definitions(config: DbtCliConfig) -> list[ToolDefinition
                 read_only_hint=True,
                 destructive_hint=False,
                 idempotent_hint=True,
+            ),
+        ),
+        ToolDefinition(
+            fn=execute_dbt_cmd,
+            description=get_prompt("dbt_cli/execute_dbt_cmd"),
+            annotations=create_tool_annotations(
+                title="dbt execute",
+                read_only_hint=False,
+                destructive_hint=True,
+                idempotent_hint=False,
             ),
         ),
         ToolDefinition(

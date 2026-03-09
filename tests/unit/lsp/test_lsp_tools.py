@@ -34,7 +34,7 @@ class MockLSPClientProvider(LSPClientProvider):
     def __init__(self, lsp_client: LSPClient):
         self.lsp_client = lsp_client
 
-    async def get_client(self) -> LSPClient:
+    async def get_client(self, project_dir: str) -> LSPClient:
         return self.lsp_client
 
 
@@ -53,6 +53,7 @@ async def test_register_lsp_tools_success(
     await register_lsp_tools(
         test_mcp_server,
         lsp_client_provider,
+        "/tmp/projects",
         disabled_tools=set(),
         enabled_tools=None,
         enabled_toolsets=set(),
@@ -65,7 +66,7 @@ async def test_register_lsp_tools_success(
 
 
 @pytest.mark.asyncio
-async def test_get_column_lineage_success() -> None:
+async def test_get_column_lineage_success(tmp_path) -> None:
     """Test successful column lineage retrieval."""
     mock_lsp_client = AsyncMock(spec=LSPClient)
     mock_lsp_client.get_column_lineage = AsyncMock(
@@ -73,7 +74,17 @@ async def test_get_column_lineage_success() -> None:
     )
     mock_provider = MockLSPClientProvider(mock_lsp_client)
 
-    result = await get_column_lineage(mock_provider, "model.project.table", "id")
+    project_root = tmp_path / "projects"
+    project_root.mkdir()
+    (project_root / "project").mkdir()
+
+    result = await get_column_lineage(
+        mock_provider,
+        str(project_root),
+        "project",
+        "model.project.table",
+        "id",
+    )
 
     assert "nodes" in result
     assert len(result["nodes"]) == 1
@@ -84,7 +95,7 @@ async def test_get_column_lineage_success() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_column_lineage_lsp_error() -> None:
+async def test_get_column_lineage_lsp_error(tmp_path) -> None:
     """Test column lineage with LSP error response."""
     mock_lsp_client = AsyncMock(spec=LSPClient)
     mock_lsp_client.get_column_lineage = AsyncMock(
@@ -92,40 +103,70 @@ async def test_get_column_lineage_lsp_error() -> None:
     )
     mock_provider = MockLSPClientProvider(mock_lsp_client)
 
-    result = await get_column_lineage(mock_provider, "invalid_model", "column")
+    project_root = tmp_path / "projects"
+    project_root.mkdir()
+    (project_root / "project").mkdir()
+
+    result = await get_column_lineage(
+        mock_provider,
+        str(project_root),
+        "project",
+        "invalid_model",
+        "column",
+    )
 
     assert "error" in result
     assert "LSP error: Model not found" in result["error"]
 
 
 @pytest.mark.asyncio
-async def test_get_column_lineage_no_results() -> None:
+async def test_get_column_lineage_no_results(tmp_path) -> None:
     """Test column lineage when no lineage is found."""
     mock_lsp_client = AsyncMock(spec=LSPClient)
     mock_lsp_client.get_column_lineage = AsyncMock(return_value={"nodes": []})
     mock_provider = MockLSPClientProvider(mock_lsp_client)
 
-    result = await get_column_lineage(mock_provider, "model.project.table", "column")
+    project_root = tmp_path / "projects"
+    project_root.mkdir()
+    (project_root / "project").mkdir()
+
+    result = await get_column_lineage(
+        mock_provider,
+        str(project_root),
+        "project",
+        "model.project.table",
+        "column",
+    )
 
     assert "error" in result
     assert "No column lineage found" in result["error"]
 
 
 @pytest.mark.asyncio
-async def test_get_column_lineage_timeout() -> None:
+async def test_get_column_lineage_timeout(tmp_path) -> None:
     """Test column lineage with timeout error."""
     mock_lsp_client = AsyncMock(spec=LSPClient)
     mock_lsp_client.get_column_lineage = AsyncMock(side_effect=TimeoutError())
     mock_provider = MockLSPClientProvider(mock_lsp_client)
 
-    result = await get_column_lineage(mock_provider, "model.project.table", "column")
+    project_root = tmp_path / "projects"
+    project_root.mkdir()
+    (project_root / "project").mkdir()
+
+    result = await get_column_lineage(
+        mock_provider,
+        str(project_root),
+        "project",
+        "model.project.table",
+        "column",
+    )
 
     assert "error" in result
     assert "Timeout waiting for column lineage" in result["error"]
 
 
 @pytest.mark.asyncio
-async def test_get_column_lineage_generic_exception() -> None:
+async def test_get_column_lineage_generic_exception(tmp_path) -> None:
     """Test column lineage with generic exception."""
     mock_lsp_client = AsyncMock(spec=LSPClient)
     mock_lsp_client.get_column_lineage = AsyncMock(
@@ -133,7 +174,17 @@ async def test_get_column_lineage_generic_exception() -> None:
     )
     mock_provider = MockLSPClientProvider(mock_lsp_client)
 
-    result = await get_column_lineage(mock_provider, "model.project.table", "column")
+    project_root = tmp_path / "projects"
+    project_root.mkdir()
+    (project_root / "project").mkdir()
+
+    result = await get_column_lineage(
+        mock_provider,
+        str(project_root),
+        "project",
+        "model.project.table",
+        "column",
+    )
 
     assert "error" in result
     assert "Failed to get column lineage" in result["error"]
@@ -150,6 +201,7 @@ async def test_register_lsp_tools_with_exclude_tools(
     await register_lsp_tools(
         test_mcp_server,
         lsp_client_provider,
+        "/tmp/projects",
         disabled_tools=set([ToolName.GET_COLUMN_LINEAGE]),
         enabled_tools=None,
         enabled_toolsets=set(),

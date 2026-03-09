@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 OAUTH_REDIRECT_STARTING_PORT = 6785
 DEFAULT_DBT_CLI_TIMEOUT = 60
+DEFAULT_MF_CLI_TIMEOUT = 60
 
 
 class AuthenticationMethod(Enum):
@@ -80,15 +81,29 @@ class DbtMcpSettings(BaseSettings):
     dbt_lsp_path: str | None = Field(None, alias="DBT_LSP_PATH")
 
     # dbt CLI settings
-    dbt_project_dir: str | None = Field(None, alias="DBT_PROJECT_DIR")
+    dbt_project_root_dir: str | None = Field(None, alias="DBT_PROJECT_ROOT_DIR")
     dbt_path: str = Field("dbt", alias="DBT_PATH")
     dbt_cli_timeout: int = Field(DEFAULT_DBT_CLI_TIMEOUT, alias="DBT_CLI_TIMEOUT")
     dbt_warn_error_options: str | None = Field(None, alias="DBT_WARN_ERROR_OPTIONS")
     dbt_profiles_dir: str | None = Field(None, alias="DBT_PROFILES_DIR")
 
+    # MCP server settings (FastMCP env vars)
+    mcp_server_host: str = Field("127.0.0.1", alias="FASTMCP_HOST")
+    mcp_server_port: int = Field(8000, alias="FASTMCP_PORT")
+    mcp_transport: str | None = Field(None, alias="MCP_TRANSPORT")
+    mcp_api_key: str | None = Field(None, alias="DBT_MCP_API_KEY")
+
+    # MetricFlow CLI settings
+    mf_path: str = Field("mf", alias="MF_PATH")
+    mf_cli_timeout: int = Field(DEFAULT_MF_CLI_TIMEOUT, alias="MF_CLI_TIMEOUT")
+
     # Disable tool settings
     disable_dbt_cli: bool = Field(False, alias="DISABLE_DBT_CLI")
     disable_dbt_codegen: bool = Field(True, alias="DISABLE_DBT_CODEGEN")
+    disable_metricflow_cli: bool = Field(False, alias="DISABLE_METRICFLOW_CLI")
+    disable_metricflow_project_files: bool = Field(
+        False, alias="DISABLE_METRICFLOW_PROJECT_FILES"
+    )
     disable_semantic_layer: bool = Field(False, alias="DISABLE_SEMANTIC_LAYER")
     disable_discovery: bool = Field(False, alias="DISABLE_DISCOVERY")
     disable_remote: bool | None = Field(None, alias="DISABLE_REMOTE")
@@ -108,6 +123,10 @@ class DbtMcpSettings(BaseSettings):
     enable_admin_api: bool = Field(False, alias="DBT_MCP_ENABLE_ADMIN_API")
     enable_dbt_cli: bool = Field(False, alias="DBT_MCP_ENABLE_DBT_CLI")
     enable_dbt_codegen: bool = Field(False, alias="DBT_MCP_ENABLE_DBT_CODEGEN")
+    enable_metricflow_cli: bool = Field(False, alias="DBT_MCP_ENABLE_METRICFLOW_CLI")
+    enable_metricflow_project_files: bool = Field(
+        False, alias="DBT_MCP_ENABLE_METRICFLOW_PROJECT_FILES"
+    )
     enable_discovery: bool = Field(False, alias="DBT_MCP_ENABLE_DISCOVERY")
     enable_lsp: bool = Field(False, alias="DBT_MCP_ENABLE_LSP")
     enable_sql: bool = Field(False, alias="DBT_MCP_ENABLE_SQL")
@@ -127,10 +146,16 @@ class DbtMcpSettings(BaseSettings):
             #  auto-disable settings
             f"DbtMcpSettings(dbt_host={self.dbt_host}, "
             f"dbt_path={self.dbt_path}, "
-            f"dbt_project_dir={self.dbt_project_dir}, "
+            f"dbt_project_root_dir={self.dbt_project_root_dir}, "
+            f"mf_path={self.mf_path}, "
+            f"mcp_server_host={self.mcp_server_host}, "
+            f"mcp_server_port={self.mcp_server_port}, "
+            f"mcp_transport={self.mcp_transport}, "
             # disable settings
             f"disable_dbt_cli={self.disable_dbt_cli}, "
             f"disable_dbt_codegen={self.disable_dbt_codegen}, "
+            f"disable_metricflow_cli={self.disable_metricflow_cli}, "
+            f"disable_metricflow_project_files={self.disable_metricflow_project_files}, "
             f"disable_semantic_layer={self.disable_semantic_layer}, "
             f"disable_discovery={self.disable_discovery}, "
             f"disable_admin_api={self.disable_admin_api}, "
@@ -143,6 +168,8 @@ class DbtMcpSettings(BaseSettings):
             f"enable_admin_api={self.enable_admin_api}, "
             f"enable_dbt_cli={self.enable_dbt_cli}, "
             f"enable_dbt_codegen={self.enable_dbt_codegen}, "
+            f"enable_metricflow_cli={self.enable_metricflow_cli}, "
+            f"enable_metricflow_project_files={self.enable_metricflow_project_files}, "
             f"enable_discovery={self.enable_discovery}, "
             f"enable_lsp={self.enable_lsp}, "
             f"enable_sql={self.enable_sql}, "
@@ -152,6 +179,7 @@ class DbtMcpSettings(BaseSettings):
             f"dbt_user_id={self.dbt_user_id}, "
             f"dbt_account_id={self.dbt_account_id}, "
             f"dbt_token={'***redacted***' if self.dbt_token else None}, "
+            f"mcp_api_key={'***redacted***' if self.mcp_api_key else None}, "
             f"send_anonymous_usage_data={self.send_anonymous_usage_data})"
         )
 
@@ -184,9 +212,21 @@ class DbtMcpSettings(BaseSettings):
 
     @property
     def dbt_project_yml(self) -> DbtProjectYaml | None:
-        if not self.dbt_project_dir:
+        if not self.dbt_project_root_dir:
             return None
-        dbt_project_yml = try_read_yaml(Path(self.dbt_project_dir) / "dbt_project.yml")
+        root = Path(self.dbt_project_root_dir).expanduser()
+        candidate = root / "dbt_project.yml"
+        if candidate.is_file():
+            dbt_project_yml = try_read_yaml(candidate)
+        else:
+            project_dirs = [
+                path
+                for path in root.iterdir()
+                if path.is_dir() and (path / "dbt_project.yml").is_file()
+            ]
+            if len(project_dirs) != 1:
+                return None
+            dbt_project_yml = try_read_yaml(project_dirs[0] / "dbt_project.yml")
         if dbt_project_yml is None:
             return None
         return DbtProjectYaml.model_validate(dbt_project_yml)
@@ -253,7 +293,24 @@ class DbtMcpSettings(BaseSettings):
             raise ValueError(f"{field_name} path does not exist: {v}")
         return v
 
-    @field_validator("dbt_project_dir", "dbt_profiles_dir", mode="after")
+    @field_validator("mf_path", mode="after")
+    @classmethod
+    def validate_mf_path_exists(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """Validate the mf binary path exists in the system."""
+        if v in ["mf"]:
+            return v
+        if v:
+            p = Path(v).expanduser()
+            if p.exists():
+                return str(p)
+
+            field_name = (
+                getattr(info, "field_name", "None") if info is not None else "None"
+            ).upper()
+            raise ValueError(f"{field_name} path does not exist: {v}")
+        return v
+
+    @field_validator("dbt_project_root_dir", "dbt_profiles_dir", mode="after")
     @classmethod
     def validate_dir_exists(cls, v: str | None, info: ValidationInfo) -> str | None:
         """Validate a directory path exists in the system."""
@@ -265,6 +322,15 @@ class DbtMcpSettings(BaseSettings):
                 ).upper()
                 raise ValueError(f"{field_name} directory does not exist: {v}")
             return str(path)
+        return v
+
+    @field_validator("mcp_api_key", mode="after")
+    @classmethod
+    def normalize_mcp_api_key(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        if isinstance(v, str) and not v.strip():
+            return None
         return v
 
     @field_validator("disable_tools", mode="before")
@@ -301,6 +367,16 @@ class DbtMcpSettings(BaseSettings):
             object.__setattr__(self, "disable_dbt_codegen", True)
             logger.warning(
                 f"CLI features have been automatically disabled due to misconfigurations:\n    {'\n    '.join(cli_errors)}."
+            )
+
+        metricflow_errors = validate_metricflow_settings(self)
+        if metricflow_errors:
+            object.__setattr__(self, "disable_metricflow_cli", True)
+            object.__setattr__(self, "disable_metricflow_project_files", True)
+            logger.warning(
+                "MetricFlow tools have been automatically disabled due to misconfigurations:\n    "
+                + "\n    ".join(metricflow_errors)
+                + "."
             )
         return self
 
@@ -485,6 +561,7 @@ def validate_settings(settings: DbtMcpSettings):
     errors: list[str] = []
     errors.extend(validate_dbt_platform_settings(settings))
     errors.extend(validate_dbt_cli_settings(settings))
+    errors.extend(validate_metricflow_settings(settings))
     if errors:
         raise ValueError("Errors found in configuration:\n\n" + "\n".join(errors))
 
@@ -543,9 +620,9 @@ def validate_dbt_platform_settings(
 def validate_dbt_cli_settings(settings: DbtMcpSettings) -> list[str]:
     errors: list[str] = []
     if not settings.disable_dbt_cli:
-        if not settings.dbt_project_dir:
+        if not settings.dbt_project_root_dir:
             errors.append(
-                "DBT_PROJECT_DIR environment variable is required when dbt CLI tools are enabled."
+                "DBT_PROJECT_ROOT_DIR environment variable is required when dbt CLI tools are enabled."
             )
         if not settings.dbt_path:
             errors.append(
@@ -556,6 +633,26 @@ def validate_dbt_cli_settings(settings: DbtMcpSettings) -> list[str]:
             if not (dbt_path.exists() or shutil.which(dbt_path)):
                 errors.append(
                     f"DBT_PATH executable can't be found: {settings.dbt_path}"
+                )
+    return errors
+
+
+def validate_metricflow_settings(settings: DbtMcpSettings) -> list[str]:
+    errors: list[str] = []
+    if not settings.disable_metricflow_cli or not settings.disable_metricflow_project_files:
+        if not settings.dbt_project_root_dir:
+            errors.append(
+                "DBT_PROJECT_ROOT_DIR environment variable is required when MetricFlow tools are enabled."
+            )
+        if not settings.mf_path:
+            errors.append(
+                "MF_PATH environment variable is required when MetricFlow tools are enabled."
+            )
+        else:
+            mf_path = Path(settings.mf_path)
+            if not (mf_path.exists() or shutil.which(mf_path)):
+                errors.append(
+                    f"MF_PATH executable can't be found: {settings.mf_path}"
                 )
     return errors
 

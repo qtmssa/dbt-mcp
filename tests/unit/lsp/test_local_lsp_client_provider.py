@@ -50,7 +50,7 @@ class TestLocalLSPClientProvider:
         provider = LocalLSPClientProvider(mock_connection_provider)
 
         # Get client
-        client = await provider.get_client()
+        client = await provider.get_client("project")
 
         # Verify client is LSPClient instance
         assert isinstance(client, LSPClient)
@@ -72,7 +72,7 @@ class TestLocalLSPClientProvider:
         )
 
         # Get client
-        client = await provider.get_client()
+        client = await provider.get_client("project")
 
         # Verify client has the custom timeout
         assert isinstance(client, LSPClient)
@@ -86,7 +86,7 @@ class TestLocalLSPClientProvider:
         provider = LocalLSPClientProvider(mock_connection_provider)
 
         # Get client
-        client = await provider.get_client()
+        client = await provider.get_client("project")
 
         # Verify client uses the default timeout from LSPClient
         from dbt_mcp.lsp.lsp_client import DEFAULT_LSP_TIMEOUT
@@ -102,7 +102,7 @@ class TestLocalLSPClientProvider:
         provider = LocalLSPClientProvider(mock_connection_provider, timeout=None)
 
         # Get client
-        client = await provider.get_client()
+        client = await provider.get_client("project")
 
         # Verify client uses the default timeout
         from dbt_mcp.lsp.lsp_client import DEFAULT_LSP_TIMEOUT
@@ -118,9 +118,9 @@ class TestLocalLSPClientProvider:
         provider = LocalLSPClientProvider(mock_connection_provider)
 
         # Get multiple clients
-        client1 = await provider.get_client()
-        client2 = await provider.get_client()
-        client3 = await provider.get_client()
+        client1 = await provider.get_client("project")
+        client2 = await provider.get_client("project")
+        client3 = await provider.get_client("project")
 
         # Each call should create a new LSPClient instance
         assert isinstance(client1, LSPClient)
@@ -153,7 +153,7 @@ class TestLocalLSPClientProvider:
 
         # Get client should propagate the error
         with pytest.raises(RuntimeError, match="Connection failed"):
-            await provider.get_client()
+            await provider.get_client("project")
 
     @pytest.mark.asyncio
     async def test_client_has_correct_connection(
@@ -163,7 +163,7 @@ class TestLocalLSPClientProvider:
         provider = LocalLSPClientProvider(mock_connection_provider, timeout=45.0)
 
         # Get client
-        client = await provider.get_client()
+        client = await provider.get_client("project")
 
         # Verify client configuration
         assert isinstance(client, LSPClient)
@@ -186,7 +186,7 @@ class TestLocalLSPClientProvider:
         provider = LocalLSPClientProvider(mock_connection_provider, timeout=60.0)
 
         # Get client
-        client = await provider.get_client()
+        client = await provider.get_client("project")
 
         # Verify we can call LSPClient methods
         assert isinstance(client, LSPClient)
@@ -221,9 +221,9 @@ class TestLocalLSPClientProvider:
         provider3 = LocalLSPClientProvider(mock_connection_provider, timeout=120.0)
 
         # Get clients from each provider
-        client1 = await provider1.get_client()
-        client2 = await provider2.get_client()
-        client3 = await provider3.get_client()
+        client1 = await provider1.get_client("project")
+        client2 = await provider2.get_client("project")
+        client3 = await provider3.get_client("project")
 
         # Verify each client has its respective timeout
         assert isinstance(client1, LSPClient)

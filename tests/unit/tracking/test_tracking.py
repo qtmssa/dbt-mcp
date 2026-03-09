@@ -227,6 +227,8 @@ class TestUsageTracker:
             disable_dbt_cli=False,
             disable_admin_api=False,
             disable_dbt_codegen=False,
+            disable_metricflow_cli=False,
+            disable_metricflow_project_files=False,
             disable_mcp_server_metadata=False,
         )
         tracker = DefaultUsageTracker(
@@ -247,6 +249,8 @@ class TestUsageTracker:
             disable_dbt_cli=True,
             disable_admin_api=True,
             disable_dbt_codegen=True,
+            disable_metricflow_cli=True,
+            disable_metricflow_project_files=True,
             disable_mcp_server_metadata=True,
         )
         tracker = DefaultUsageTracker(
@@ -262,6 +266,8 @@ class TestUsageTracker:
             Toolset.DBT_CLI,
             Toolset.ADMIN_API,
             Toolset.DBT_CODEGEN,
+            Toolset.METRICFLOW_CLI,
+            Toolset.METRICFLOW_PROJECT_FILES,
             Toolset.MCP_SERVER_METADATA,
         }
 

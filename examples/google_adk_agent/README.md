@@ -10,7 +10,7 @@ Set the following environment variables:
 - `DBT_TOKEN`
 - `DBT_PROD_ENV_ID`
 - `DBT_HOST` (if not using the default `cloud.getdbt.com`)
-- `DBT_PROJECT_DIR` (if using dbt core)
+- `DBT_PROJECT_ROOT_DIR` (if using dbt core)
 
 ### Usage
 

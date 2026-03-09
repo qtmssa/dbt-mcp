@@ -24,6 +24,8 @@ except Exception:
     # don't raise here — the tests will surface the import problem separately.
     pass
 
+from tests.env_vars import get_env_value
+
 
 @pytest.fixture
 def env_setup(tmp_path: Path, monkeypatch):
@@ -46,30 +48,54 @@ def env_setup(tmp_path: Path, monkeypatch):
     def _make(
         env_vars: dict[str, str] | None = None, files: dict[str, str] | None = None
     ):
-        project_dir = tmp_path / "project"
-        project_dir.mkdir()
+        override_root_dir = (env_vars or {}).get("DBT_PROJECT_ROOT_DIR")
+        root_dir_value = override_root_dir or get_env_value("DBT_PROJECT_ROOT_DIR")
+        root_dir = Path(root_dir_value) if root_dir_value else (tmp_path / "projects")
+        root_dir.mkdir(parents=True, exist_ok=True)
+        project_name = f"test_project_{tmp_path.name}"
+        project_dir = root_dir / project_name
+        project_dir.mkdir(parents=True, exist_ok=True)
 
-        # a placeholder dbt file (tests expect a path called 'dbt')
-        dbt_path = tmp_path / "dbt"
-        dbt_path.touch()
-        # make the fake dbt executable so shutil.which() will locate it on Unix
-        try:
-            dbt_path.chmod(0o755)
-        except Exception:
-            pass
+        dbt_path_value = get_env_value("DBT_PATH", "dbt")
+        mf_path_value = get_env_value("MF_PATH", "mf")
+        path_plus_tmp_path = os.environ.get("PATH", "")
+        created_fake_binaries = []
+        if dbt_path_value == "dbt" or mf_path_value == "mf":
+            # a placeholder dbt/mf file if PATH lookup is needed
+            dbt_path = tmp_path / "dbt"
+            mf_path = tmp_path / "mf"
+            dbt_path.touch()
+            mf_path.touch()
+            created_fake_binaries.extend([dbt_path, mf_path])
+            try:
+                dbt_path.chmod(0o755)
+                mf_path.chmod(0o755)
+            except Exception:
+                pass
+            path_plus_tmp_path = path_plus_tmp_path + os.pathsep + str(tmp_path)
 
-        path_plus_tmp_path = os.environ.get("PATH", "") + os.pathsep + str(tmp_path)
         default_env_vars = {
-            "DBT_PROJECT_DIR": str(
-                project_dir
-            ),  # so cli doesn't get disabled automatically
-            "PATH": path_plus_tmp_path,  # so it can find fake `dbt` that we created
-            "DBT_HOST": "http://localhost:8000",  # so platform doesn't get auto-disabled
+            "DBT_PROJECT_ROOT_DIR": str(root_dir),
+            "DBT_PATH": dbt_path_value,
+            "MF_PATH": mf_path_value,
+            "PATH": path_plus_tmp_path,
+            "DBT_HOST": get_env_value("DBT_HOST", "http://localhost:8000"),
         }
 
         # Clear env vars that might interfere with tests from the user's environment
         # Save original values so we can restore them after the test
-        env_vars_to_clear = ["DBT_MCP_ENABLE_TOOLS", "DISABLE_TOOLS"]
+        env_vars_to_clear = [
+            "FASTMCP_HOST",
+            "FASTMCP_PORT",
+            "MCP_TRANSPORT",
+            "DBT_MCP_API_KEY",
+            "DBT_MCP_ENABLE_TOOLS",
+            "DBT_MCP_ENABLE_METRICFLOW_CLI",
+            "DBT_MCP_ENABLE_METRICFLOW_PROJECT_FILES",
+            "DISABLE_TOOLS",
+            "DISABLE_METRICFLOW_CLI",
+            "DISABLE_METRICFLOW_PROJECT_FILES",
+        ]
         original_values = {k: os.environ.get(k) for k in env_vars_to_clear}
         for var_to_clear in env_vars_to_clear:
             os.environ.pop(var_to_clear, None)
@@ -117,7 +143,8 @@ def env_setup(tmp_path: Path, monkeypatch):
                 if v is not None:
                     os.environ[k] = v
             shutil.rmtree(project_dir, ignore_errors=True)
-            dbt_path.unlink(missing_ok=True)
+            for fake_bin in created_fake_binaries:
+                fake_bin.unlink(missing_ok=True)
 
     yield _make
 
@@ -141,3 +168,22 @@ class MockFastMCP:
 def mock_fastmcp():
     fastmcp = MockFastMCP()
     return fastmcp, fastmcp.tools
+
+
+@pytest.fixture
+def project_root_dir():
+    root_dir_value = get_env_value("DBT_PROJECT_ROOT_DIR", "tests")
+    root_dir = Path(root_dir_value)
+    root_dir.mkdir(parents=True, exist_ok=True)
+    return root_dir
+
+
+@pytest.fixture
+def project_path(tmp_path: Path, project_root_dir: Path):
+    project_name = f"test_project_{tmp_path.name}"
+    project_dir = project_root_dir / project_name
+    project_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        yield project_name
+    finally:
+        shutil.rmtree(project_dir, ignore_errors=True)

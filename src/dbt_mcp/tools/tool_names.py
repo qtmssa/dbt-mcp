@@ -13,6 +13,7 @@ class ToolName(Enum):
     RUN = "run"
     TEST = "test"
     SHOW = "show"
+    EXECUTE_DBT_CMD = "execute_dbt_cmd"
     GET_LINEAGE_DEV = "get_lineage_dev"
     GET_NODE_DETAILS_DEV = "get_node_details_dev"
 
@@ -67,6 +68,18 @@ class ToolName(Enum):
     GENERATE_SOURCE = "generate_source"
     GENERATE_MODEL_YAML = "generate_model_yaml"
     GENERATE_STAGING_MODEL = "generate_staging_model"
+
+    # MetricFlow CLI tools
+    MF_HEALTH_CHECKS = "mf.health-checks"
+    MF_LIST = "mf.list"
+    MF_QUERY = "mf.query"
+    MF_TUTORIAL = "mf.tutorial"
+    MF_VALIDATE_CONFIGS = "mf.validate-configs"
+    EXECUTE_MF_CMD = "execute_mf_cmd"
+    LIST_PROJECTS = "list_projects"
+    IS_PROJECT_EXIST = "is_project_exist"
+    UPLOAD_PROJECT_ZIP_URL = "upload_project_zip_url"
+    DELETE_PROJECT = "delete_project"
 
     # dbt LSP tools
     GET_COLUMN_LINEAGE = "get_column_lineage"

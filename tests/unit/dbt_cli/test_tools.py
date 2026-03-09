@@ -87,6 +87,7 @@ def test_show_command_limit_logic(
     monkeypatch: MonkeyPatch,
     mock_process,
     mock_fastmcp,
+    project_path,
     sql_query,
     limit_param,
     expected_args,
@@ -113,7 +114,7 @@ def test_show_command_limit_logic(
     show_tool = tools["show"]
 
     # Call show tool with test parameters
-    show_tool(sql_query=sql_query, limit=limit_param)
+    show_tool(project_path=project_path, sql_query=sql_query, limit=limit_param)
 
     # Verify the command was called with expected arguments
     assert mock_calls
@@ -122,7 +123,7 @@ def test_show_command_limit_logic(
 
 
 def test_run_command_adds_quiet_flag_to_verbose_commands(
-    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path
 ):
     # Mock Popen
     mock_calls = []
@@ -146,7 +147,7 @@ def test_run_command_adds_quiet_flag_to_verbose_commands(
     run_tool = tools["run"]
 
     # Execute
-    run_tool()
+    run_tool(project_path=project_path)
 
     # Verify
     assert mock_calls
@@ -155,7 +156,7 @@ def test_run_command_adds_quiet_flag_to_verbose_commands(
 
 
 def test_run_command_correctly_formatted(
-    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path
 ):
     # Mock Popen
     mock_calls = []
@@ -180,13 +181,13 @@ def test_run_command_correctly_formatted(
     run_tool = tools["run"]
 
     # Run the command with a selector
-    run_tool(selector="my_model")
+    run_tool(project_path=project_path, selector="my_model")
 
     # Verify the command is correctly formatted
     assert mock_calls
     args_list = mock_calls[0]
     assert args_list == [
-        "/path/to/dbt",
+        mock_dbt_cli_config.dbt_path,
         "--no-use-colors",
         "run",
         "--quiet",
@@ -196,7 +197,7 @@ def test_run_command_correctly_formatted(
 
 
 def test_show_command_correctly_formatted(
-    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path
 ):
     # Mock Popen
     mock_calls = []
@@ -220,12 +221,12 @@ def test_show_command_correctly_formatted(
     show_tool = tools["show"]
 
     # Execute
-    show_tool(sql_query="SELECT * FROM my_model")
+    show_tool(project_path=project_path, sql_query="SELECT * FROM my_model")
 
     # Verify
     assert mock_calls
     args_list = mock_calls[0]
-    assert args_list[0].endswith("dbt")
+    assert args_list[0] == mock_dbt_cli_config.dbt_path
     assert args_list[1] == "--no-use-colors"
     assert args_list[2] == "show"
     assert args_list[3] == "--inline"
@@ -233,7 +234,9 @@ def test_show_command_correctly_formatted(
     assert args_list[5] == "--favor-state"
 
 
-def test_list_command_timeout_handling(monkeypatch: MonkeyPatch, mock_fastmcp):
+def test_list_command_timeout_handling(
+    monkeypatch: MonkeyPatch, mock_fastmcp, project_path
+):
     # Mock Popen
     class MockProcessWithTimeout:
         def communicate(self, timeout=None):
@@ -257,19 +260,21 @@ def test_list_command_timeout_handling(monkeypatch: MonkeyPatch, mock_fastmcp):
     list_tool = tools["ls"]
 
     # Test timeout case
-    result = list_tool(resource_type=["model", "snapshot"])
+    result = list_tool(project_path=project_path, resource_type=["model", "snapshot"])
     assert "Timeout: dbt command took too long to complete" in result
     assert "Try using a specific selector to narrow down the results" in result
 
     # Test with selector - should still timeout
-    result = list_tool(selector="my_model", resource_type=["model"])
+    result = list_tool(
+        project_path=project_path, selector="my_model", resource_type=["model"]
+    )
     assert "Timeout: dbt command took too long to complete" in result
     assert "Try using a specific selector to narrow down the results" in result
 
 
 @pytest.mark.parametrize("command_name", ["run", "build"])
 def test_full_refresh_flag_added_to_command(
-    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, command_name
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path, command_name
 ):
     mock_calls = []
 
@@ -290,7 +295,7 @@ def test_full_refresh_flag_added_to_command(
     )
     tool = tools[command_name]
 
-    tool(is_full_refresh=True)
+    tool(project_path=project_path, is_full_refresh=True)
 
     assert mock_calls
     args_list = mock_calls[0]
@@ -299,7 +304,7 @@ def test_full_refresh_flag_added_to_command(
 
 @pytest.mark.parametrize("command_name", ["build", "run", "test"])
 def test_vars_flag_added_to_command(
-    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, command_name
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path, command_name
 ):
     mock_calls = []
 
@@ -320,7 +325,7 @@ def test_vars_flag_added_to_command(
     )
     tool = tools[command_name]
 
-    tool(vars="environment: production")
+    tool(project_path=project_path, vars="environment: production")
 
     assert mock_calls
     args_list = mock_calls[0]
@@ -328,7 +333,9 @@ def test_vars_flag_added_to_command(
     assert "environment: production" in args_list
 
 
-def test_vars_not_added_when_none(monkeypatch: MonkeyPatch, mock_process, mock_fastmcp):
+def test_vars_not_added_when_none(
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path
+):
     mock_calls = []
 
     def mock_popen(args, **kwargs):
@@ -348,8 +355,42 @@ def test_vars_not_added_when_none(monkeypatch: MonkeyPatch, mock_process, mock_f
     )
     build_tool = tools["build"]
 
-    build_tool()  # Non-explicit
+    build_tool(project_path=project_path)  # Non-explicit
 
     assert mock_calls
     args_list = mock_calls[0]
     assert "--vars" not in args_list
+
+
+def test_execute_dbt_cmd_passes_args(
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path
+):
+    mock_calls = []
+
+    def mock_popen(args, **kwargs):
+        mock_calls.append(args)
+        return mock_process
+
+    monkeypatch.setattr("subprocess.Popen", mock_popen)
+
+    fastmcp, tools = mock_fastmcp
+    register_dbt_cli_tools(
+        fastmcp,
+        mock_dbt_cli_config,
+        disabled_tools=set(),
+        enabled_tools=None,
+        enabled_toolsets=set(),
+        disabled_toolsets=set(),
+    )
+    execute_tool = tools["execute_dbt_cmd"]
+
+    execute_tool(project_path=project_path, command_args=["run", "--select", "my_model"])
+
+    assert mock_calls
+    assert mock_calls[0] == [
+        mock_dbt_cli_config.dbt_path,
+        "--no-use-colors",
+        "run",
+        "--select",
+        "my_model",
+    ]

@@ -43,7 +43,9 @@ class LocalLSPClientProvider(LSPClientProvider):
         self.lsp_connection_provider = lsp_connection_provider
         self.timeout = timeout
 
-    async def get_client(self, timeout: float | None = None) -> LSPClientProtocol:
+    async def get_client(
+        self, project_dir: str, timeout: float | None = None
+    ) -> LSPClientProtocol:
         """Create a new LSPClient instance using the managed connection.
 
         Creates a new LSPClient instance that wraps the shared connection.

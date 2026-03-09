@@ -20,6 +20,25 @@ The dbt MCP server architecture allows for your agent to connect to a variety of
 
 ![architecture diagram of the dbt MCP server](https://raw.githubusercontent.com/dbt-labs/dbt-mcp/refs/heads/main/docs/d2.png)
 
+## Server Configuration
+
+### Transport, Host, Port
+- `MCP_TRANSPORT`: `stdio` / `sse` / `streamable-http`
+- `FASTMCP_HOST`: listening host (default `127.0.0.1`)
+- `FASTMCP_PORT`: listening port (default `8000`)
+
+### API Key Authentication
+- `DBT_MCP_API_KEY`: when set, requires `Authorization: Bearer <key>` for both `streamable-http` and `sse`
+- when unset, authentication is disabled (useful for local development)
+
+Example:
+```bash
+MCP_TRANSPORT=streamable-http
+FASTMCP_HOST=0.0.0.0
+FASTMCP_PORT=8000
+DBT_MCP_API_KEY=your-api-key
+```
+
 ## Tools
 
 ### SQL
@@ -85,6 +104,13 @@ The dbt MCP server architecture allows for your agent to connect to a variety of
 - `generate_model_yaml`: Generates model YAML with columns; option to inherit upstream descriptions.
 - `generate_source`: Generates source YAML by introspecting database schemas; option to include columns.
 - `generate_staging_model`: Generates staging model SQL from a source table.
+
+### MetricFlow
+- `mf.health-checks`: Performs MetricFlow health checks against the configured data warehouse.
+- `mf.list`: Lists MetricFlow resources and metadata.
+- `mf.query`: Runs a MetricFlow query to assemble and execute metric SQL.
+- `mf.tutorial`: Runs the MetricFlow tutorial workflow.
+- `mf.validate-configs`: Validates MetricFlow configuration and model definitions.
 
 ### dbt LSP
 - `fusion.compile_sql`: Compiles SQL in project context via dbt Platform.

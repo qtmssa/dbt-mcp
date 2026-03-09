@@ -2,7 +2,9 @@ from dbt_mcp.config.config import (
     Config,
     DbtCliConfig,
     DbtCodegenConfig,
+    MetricflowConfig,
     LspConfig,
+    McpServerConfig,
 )
 from dbt_mcp.config.config_providers import (
     AdminApiConfig,
@@ -24,8 +26,13 @@ from dbt_mcp.config.settings import CredentialsProvider, DbtMcpSettings
 from dbt_mcp.dbt_cli.binary_type import BinaryType
 from dbt_mcp.lsp.lsp_binary_manager import LspBinaryInfo
 from dbt_mcp.oauth.token_provider import StaticTokenProvider
+from tests.env_vars import get_env_value
 
 mock_settings = DbtMcpSettings.model_construct()
+
+_PROJECT_ROOT_DIR = get_env_value("DBT_PROJECT_ROOT_DIR", "/test/projects")
+_DBT_PATH = get_env_value("DBT_PATH", "/path/to/dbt")
+_MF_PATH = get_env_value("MF_PATH", "/path/to/mf")
 
 mock_proxied_tool_config = ProxiedToolConfig(
     url="http://localhost:8000",
@@ -38,25 +45,38 @@ mock_proxied_tool_config = ProxiedToolConfig(
 )
 
 mock_dbt_cli_config = DbtCliConfig(
-    project_dir="/test/project",
-    dbt_path="/path/to/dbt",
+    project_root_dir=_PROJECT_ROOT_DIR,
+    dbt_path=_DBT_PATH,
     dbt_cli_timeout=10,
     binary_type=BinaryType.DBT_CORE,
 )
 
 mock_dbt_codegen_config = DbtCodegenConfig(
-    project_dir="/test/project",
-    dbt_path="/path/to/dbt",
+    project_root_dir=_PROJECT_ROOT_DIR,
+    dbt_path=_DBT_PATH,
     dbt_cli_timeout=10,
     binary_type=BinaryType.DBT_CORE,
 )
 
+mock_metricflow_config = MetricflowConfig(
+    project_root_dir=_PROJECT_ROOT_DIR,
+    mf_path=_MF_PATH,
+    mf_cli_timeout=10,
+)
+
 mock_lsp_config = LspConfig(
-    project_dir="/test/project",
+    project_root_dir=_PROJECT_ROOT_DIR,
     lsp_binary_info=LspBinaryInfo(
         path="/path/to/lsp",
         version="1.0.0",
     ),
+)
+
+mock_mcp_server_config = McpServerConfig(
+    host="127.0.0.1",
+    port=8000,
+    transport="stdio",
+    api_key=None,
 )
 
 mock_discovery_config = DiscoveryConfig(
@@ -132,6 +152,7 @@ mock_config = Config(
     proxied_tool_config_provider=MockProxiedToolConfigProvider(),
     dbt_cli_config=mock_dbt_cli_config,
     dbt_codegen_config=mock_dbt_codegen_config,
+    metricflow_config=mock_metricflow_config,
     discovery_config_provider=MockDiscoveryConfigProvider(),
     semantic_layer_config_provider=MockSemanticLayerConfigProvider(),
     admin_api_config_provider=MockAdminApiConfigProvider(),
@@ -141,4 +162,5 @@ mock_config = Config(
     disabled_toolsets=set(),
     enabled_toolsets=set(),
     credentials_provider=MockCredentialsProvider(),
+    mcp_server_config=mock_mcp_server_config,
 )

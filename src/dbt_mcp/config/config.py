@@ -12,6 +12,7 @@ from dbt_mcp.config.settings import (
     DbtMcpSettings,
     DbtMcpLogSettings,
 )
+from dbt_mcp.config.transport import validate_transport
 from dbt_mcp.dbt_cli.binary_type import BinaryType, detect_binary_type
 from dbt_mcp.lsp.lsp_binary_manager import LspBinaryInfo, dbt_lsp_binary_info
 from dbt_mcp.telemetry.logging import configure_logging
@@ -25,6 +26,8 @@ TOOLSET_TO_DISABLE_ATTR = {
     Toolset.ADMIN_API: "disable_admin_api",
     Toolset.DBT_CLI: "disable_dbt_cli",
     Toolset.DBT_CODEGEN: "disable_dbt_codegen",
+    Toolset.METRICFLOW_CLI: "disable_metricflow_cli",
+    Toolset.METRICFLOW_PROJECT_FILES: "disable_metricflow_project_files",
     Toolset.DISCOVERY: "disable_discovery",
     Toolset.DBT_LSP: "disable_lsp",
     Toolset.SQL: "actual_disable_sql",
@@ -36,6 +39,8 @@ TOOLSET_TO_ENABLE_ATTR = {
     Toolset.ADMIN_API: "enable_admin_api",
     Toolset.DBT_CLI: "enable_dbt_cli",
     Toolset.DBT_CODEGEN: "enable_dbt_codegen",
+    Toolset.METRICFLOW_CLI: "enable_metricflow_cli",
+    Toolset.METRICFLOW_PROJECT_FILES: "enable_metricflow_project_files",
     Toolset.DISCOVERY: "enable_discovery",
     Toolset.DBT_LSP: "enable_lsp",
     Toolset.SQL: "enable_sql",
@@ -45,7 +50,7 @@ TOOLSET_TO_ENABLE_ATTR = {
 
 @dataclass
 class DbtCliConfig:
-    project_dir: str
+    project_root_dir: str
     dbt_path: str
     dbt_cli_timeout: int
     binary_type: BinaryType
@@ -53,16 +58,31 @@ class DbtCliConfig:
 
 @dataclass
 class DbtCodegenConfig:
-    project_dir: str
+    project_root_dir: str
     dbt_path: str
     dbt_cli_timeout: int
     binary_type: BinaryType
 
 
 @dataclass
+class MetricflowConfig:
+    project_root_dir: str
+    mf_path: str
+    mf_cli_timeout: int
+
+
+@dataclass
 class LspConfig:
-    project_dir: str
+    project_root_dir: str
     lsp_binary_info: LspBinaryInfo | None
+
+
+@dataclass
+class McpServerConfig:
+    host: str
+    port: int
+    transport: str
+    api_key: str | None
 
 
 @dataclass
@@ -74,11 +94,13 @@ class Config:
     proxied_tool_config_provider: DefaultProxiedToolConfigProvider | None
     dbt_cli_config: DbtCliConfig | None
     dbt_codegen_config: DbtCodegenConfig | None
+    metricflow_config: MetricflowConfig | None
     discovery_config_provider: DefaultDiscoveryConfigProvider | None
     semantic_layer_config_provider: DefaultSemanticLayerConfigProvider | None
     admin_api_config_provider: DefaultAdminApiConfigProvider | None
     credentials_provider: CredentialsProvider
     lsp_config: LspConfig | None
+    mcp_server_config: McpServerConfig
 
 
 def load_config(enable_proxied_tools: bool = True) -> Config:
@@ -120,23 +142,31 @@ def load_config(enable_proxied_tools: bool = True) -> Config:
         )
 
     dbt_cli_config = None
-    if settings.dbt_project_dir and settings.dbt_path:
+    if settings.dbt_project_root_dir and settings.dbt_path:
         binary_type = detect_binary_type(settings.dbt_path)
         dbt_cli_config = DbtCliConfig(
-            project_dir=settings.dbt_project_dir,
+            project_root_dir=settings.dbt_project_root_dir,
             dbt_path=settings.dbt_path,
             dbt_cli_timeout=settings.dbt_cli_timeout,
             binary_type=binary_type,
         )
 
     dbt_codegen_config = None
-    if settings.dbt_project_dir and settings.dbt_path:
+    if settings.dbt_project_root_dir and settings.dbt_path:
         binary_type = detect_binary_type(settings.dbt_path)
         dbt_codegen_config = DbtCodegenConfig(
-            project_dir=settings.dbt_project_dir,
+            project_root_dir=settings.dbt_project_root_dir,
             dbt_path=settings.dbt_path,
             dbt_cli_timeout=settings.dbt_cli_timeout,
             binary_type=binary_type,
+        )
+
+    metricflow_config = None
+    if settings.dbt_project_root_dir and settings.mf_path:
+        metricflow_config = MetricflowConfig(
+            project_root_dir=settings.dbt_project_root_dir,
+            mf_path=settings.mf_path,
+            mf_cli_timeout=settings.mf_cli_timeout,
         )
 
     discovery_config_provider = None
@@ -152,12 +182,20 @@ def load_config(enable_proxied_tools: bool = True) -> Config:
         )
 
     lsp_config = None
-    if settings.dbt_project_dir:
+    if settings.dbt_project_root_dir:
         lsp_binary_info = dbt_lsp_binary_info(settings.dbt_lsp_path)
         lsp_config = LspConfig(
-            project_dir=settings.dbt_project_dir,
+            project_root_dir=settings.dbt_project_root_dir,
             lsp_binary_info=lsp_binary_info,
         )
+
+    transport = validate_transport(settings.mcp_transport or "stdio")
+    mcp_server_config = McpServerConfig(
+        host=settings.mcp_server_host,
+        port=settings.mcp_server_port,
+        transport=transport,
+        api_key=settings.mcp_api_key,
+    )
 
     return Config(
         disable_tools=settings.disable_tools or [],
@@ -167,9 +205,11 @@ def load_config(enable_proxied_tools: bool = True) -> Config:
         proxied_tool_config_provider=proxied_tool_config_provider,
         dbt_cli_config=dbt_cli_config,
         dbt_codegen_config=dbt_codegen_config,
+        metricflow_config=metricflow_config,
         discovery_config_provider=discovery_config_provider,
         semantic_layer_config_provider=semantic_layer_config_provider,
         admin_api_config_provider=admin_api_config_provider,
         credentials_provider=credentials_provider,
         lsp_config=lsp_config,
+        mcp_server_config=mcp_server_config,
     )

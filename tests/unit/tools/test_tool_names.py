@@ -4,8 +4,9 @@ from dbt_mcp.config.config import load_config
 from dbt_mcp.dbt_cli.binary_type import BinaryType
 from dbt_mcp.lsp.lsp_binary_manager import LspBinaryInfo
 from dbt_mcp.mcp.server import create_dbt_mcp
+from dbt_mcp.tools.register import should_register_tool
 from dbt_mcp.tools.tool_names import ToolName
-from dbt_mcp.tools.toolsets import proxied_tools
+from dbt_mcp.tools.toolsets import TOOL_TO_TOOLSET, proxied_tools
 
 
 async def test_tool_names_match_server_tools(env_setup):
@@ -30,12 +31,37 @@ async def test_tool_names_match_server_tools(env_setup):
 
         # Get all tools from the server
         server_tools = await dbt_mcp.list_tools()
-        # Manually adding proxied tools here because the server doesn't get them
-        # in this unit test.
-        server_tool_names = {tool.name for tool in server_tools} | {
-            p.value for p in proxied_tools
+        enabled_tools = set(config.enable_tools) if config.enable_tools is not None else None
+        disabled_tools = set(config.disable_tools or [])
+        enabled_toolsets = config.enabled_toolsets
+        disabled_toolsets = config.disabled_toolsets
+
+        # Manually add proxied tools only if they'd be enabled by filters
+        expected_proxied = {
+            p.value
+            for p in proxied_tools
+            if should_register_tool(
+                tool_name=p,
+                enabled_tools=enabled_tools,
+                disabled_tools=disabled_tools,
+                enabled_toolsets=enabled_toolsets,
+                disabled_toolsets=disabled_toolsets,
+                tool_to_toolset=TOOL_TO_TOOLSET,
+            )
         }
-        enum_names = {n for n in ToolName.get_all_tool_names()}
+        server_tool_names = {tool.name for tool in server_tools} | expected_proxied
+        enum_names = {
+            tool.value
+            for tool in ToolName
+            if should_register_tool(
+                tool_name=tool,
+                enabled_tools=enabled_tools,
+                disabled_tools=disabled_tools,
+                enabled_toolsets=enabled_toolsets,
+                disabled_toolsets=disabled_toolsets,
+                tool_to_toolset=TOOL_TO_TOOLSET,
+            )
+        }
 
         # This should not raise any errors if the enum is in sync
         if server_tool_names != enum_names:

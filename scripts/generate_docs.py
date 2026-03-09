@@ -31,6 +31,7 @@ def format_toolset_heading(toolset_value: str) -> str:
 
     # "dbt" stylized as lowercase
     text = re.sub(r"\bDbt\b", "dbt", text)
+    text = re.sub(r"\bMetricflow\b", "MetricFlow", text)
 
     return text
 

@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import time
 import uuid
@@ -9,6 +8,7 @@ from typing import Any
 from dbtlabs_vortex.producer import shutdown
 from mcp.server.fastmcp import FastMCP
 from mcp.server.lowlevel.server import LifespanResultT
+from mcp.server.auth.settings import AuthSettings
 from mcp.types import ContentBlock, TextContent
 
 from dbt_mcp.config.config import Config
@@ -16,13 +16,13 @@ from dbt_mcp.dbt_admin.tools import register_admin_api_tools
 from dbt_mcp.dbt_cli.tools import register_dbt_cli_tools
 from dbt_mcp.dbt_codegen.tools import register_dbt_codegen_tools
 from dbt_mcp.discovery.tools import register_discovery_tools
+from dbt_mcp.metricflow.tools import register_metricflow_tools
 from dbt_mcp.mcp_server_metadata.tools import register_mcp_server_tools
-from dbt_mcp.lsp.providers.local_lsp_client_provider import LocalLSPClientProvider
-from dbt_mcp.lsp.providers.local_lsp_connection_provider import (
-    LocalLSPConnectionProvider,
+from dbt_mcp.lsp.providers.project_lsp_client_provider import (
+    ProjectLSPClientProvider,
 )
-from dbt_mcp.lsp.providers.lsp_connection_provider import LSPConnectionProviderProtocol
 from dbt_mcp.lsp.tools import register_lsp_tools
+from dbt_mcp.mcp.api_key_auth import ApiKeyTokenVerifier
 from dbt_mcp.proxy.tools import ProxiedToolsManager, register_proxied_tools
 from dbt_mcp.semantic_layer.client import DefaultSemanticLayerClientProvider
 from dbt_mcp.semantic_layer.tools import register_sl_tools
@@ -42,17 +42,14 @@ class DbtMCP(FastMCP):
             ]
             | None
         ),
-        lsp_connection_provider: LocalLSPConnectionProvider | None = None,
+        lsp_client_provider: ProjectLSPClientProvider | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs, lifespan=lifespan)
         self.usage_tracker = usage_tracker
         self.config = config
-        self.lsp_connection_provider = lsp_connection_provider
-        self._lsp_connection_task: (
-            asyncio.Task[LSPConnectionProviderProtocol] | None
-        ) = None
+        self.lsp_client_provider = lsp_client_provider
 
     async def call_tool(
         self, name: str, arguments: dict[str, Any]
@@ -124,9 +121,6 @@ async def app_lifespan(server: FastMCP[Any]) -> AsyncIterator[bool | None]:
                 disabled_toolsets=server.config.disabled_toolsets,
             )
 
-        # eager start and initialize the LSP connection
-        if server.lsp_connection_provider:
-            asyncio.create_task(server.lsp_connection_provider.get_connection())
         yield None
     except Exception as e:
         logger.error(f"Error in MCP server: {e}")
@@ -138,8 +132,8 @@ async def app_lifespan(server: FastMCP[Any]) -> AsyncIterator[bool | None]:
         except Exception:
             logger.exception("Error closing proxied tools manager")
         try:
-            if server.lsp_connection_provider:
-                await server.lsp_connection_provider.cleanup_connection()
+            if server.lsp_client_provider:
+                await server.lsp_client_provider.cleanup_connections()
         except Exception:
             logger.exception("Error cleaning up LSP connection")
         try:
@@ -149,6 +143,23 @@ async def app_lifespan(server: FastMCP[Any]) -> AsyncIterator[bool | None]:
 
 
 async def create_dbt_mcp(config: Config) -> DbtMCP:
+    logger.info(
+        "FastMCP config resolved: transport=%s host=%s port=%s api_key_set=%s",
+        config.mcp_server_config.transport,
+        config.mcp_server_config.host,
+        config.mcp_server_config.port,
+        bool(config.mcp_server_config.api_key),
+    )
+    auth_settings = None
+    token_verifier = None
+    if config.mcp_server_config.api_key:
+        auth_settings = AuthSettings(
+            issuer_url="http://localhost",
+            resource_server_url=None,
+            required_scopes=[],
+        )
+        token_verifier = ApiKeyTokenVerifier(config.mcp_server_config.api_key)
+
     dbt_mcp = DbtMCP(
         config=config,
         usage_tracker=DefaultUsageTracker(
@@ -157,6 +168,10 @@ async def create_dbt_mcp(config: Config) -> DbtMCP:
         ),
         name="dbt",
         lifespan=app_lifespan,
+        auth=auth_settings,
+        token_verifier=token_verifier,
+        host=config.mcp_server_config.host,
+        port=config.mcp_server_config.port,
     )
 
     disabled_tools = set(config.disable_tools)
@@ -165,6 +180,13 @@ async def create_dbt_mcp(config: Config) -> DbtMCP:
     )
     enabled_toolsets = config.enabled_toolsets
     disabled_toolsets = config.disabled_toolsets
+    logger.info(
+        "Toolset filters: enabled_toolsets=%s disabled_toolsets=%s enabled_tools=%s disabled_tools=%s",
+        sorted([toolset.value for toolset in enabled_toolsets]),
+        sorted([toolset.value for toolset in disabled_toolsets]),
+        sorted([tool.value for tool in enabled_tools]) if enabled_tools else [],
+        sorted([tool.value for tool in disabled_tools]),
+    )
 
     # Register MCP server tools (always available)
     logger.info("Registering MCP server tools")
@@ -223,6 +245,17 @@ async def create_dbt_mcp(config: Config) -> DbtMCP:
             disabled_toolsets=disabled_toolsets,
         )
 
+    if config.metricflow_config:
+        logger.info("Registering MetricFlow CLI tools")
+        register_metricflow_tools(
+            dbt_mcp,
+            config=config.metricflow_config,
+            disabled_tools=disabled_tools,
+            enabled_tools=enabled_tools,
+            enabled_toolsets=enabled_toolsets,
+            disabled_toolsets=disabled_toolsets,
+        )
+
     if config.admin_api_config_provider:
         logger.info("Registering dbt admin API tools")
         register_admin_api_tools(
@@ -236,17 +269,14 @@ async def create_dbt_mcp(config: Config) -> DbtMCP:
 
     if config.lsp_config and config.lsp_config.lsp_binary_info:
         logger.info("Registering LSP tools")
-        local_lsp_connection_provider = LocalLSPConnectionProvider(
+        lsp_client_provider = ProjectLSPClientProvider(
             lsp_binary_info=config.lsp_config.lsp_binary_info,
-            project_dir=config.lsp_config.project_dir,
         )
-        lsp_client_provider = LocalLSPClientProvider(
-            lsp_connection_provider=local_lsp_connection_provider,
-        )
-        dbt_mcp.lsp_connection_provider = local_lsp_connection_provider
+        dbt_mcp.lsp_client_provider = lsp_client_provider
         await register_lsp_tools(
             dbt_mcp,
             lsp_client_provider,
+            config.lsp_config.project_root_dir,
             disabled_tools=disabled_tools,
             enabled_tools=enabled_tools,
             enabled_toolsets=enabled_toolsets,

@@ -3,8 +3,8 @@
     "name": "dbt-mcp",
     "display_name": "dbt MCP Server",
     "version": "{dynamic-version}",
-    "description": "A MCP (Model Context Protocol) server for interacting with dbt.",
-    "long_description": "This MCP (Model Context Protocol) server provides various tools to interact with dbt. You can use this MCP server to provide AI agents with context of your project in dbt Core, dbt Fusion, and dbt Platform.",
+    "description": "用于与 dbt 交互的 MCP（Model Context Protocol）服务器，支持本地模式与远程模式（远程模式需先上传 dbt 项目文件）。",
+    "long_description": "该 MCP（Model Context Protocol）服务器提供与 dbt 交互的多种工具，支持两种模式：本地模式使用服务器本地的 dbt 项目目录；远程模式在无本地项目时需先上传 dbt 项目文件（如 ZIP）以便提供项目上下文。适用于 dbt Core、dbt Fusion 与 dbt Platform。",
     "author": {
         "name": "dbt Labs",
         "url": "https://www.getdbt.com"

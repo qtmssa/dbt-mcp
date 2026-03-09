@@ -8,7 +8,8 @@ from dbt_mcp.config.config import (
 from dbt_mcp.dbt_cli.binary_type import BinaryType
 from dbt_mcp.lsp.lsp_binary_manager import LspBinaryInfo
 from dbt_mcp.mcp.server import create_dbt_mcp
-from dbt_mcp.tools.toolsets import Toolset, proxied_tools, toolsets
+from dbt_mcp.tools.register import should_register_tool
+from dbt_mcp.tools.toolsets import TOOL_TO_TOOLSET, Toolset, proxied_tools, toolsets
 
 
 def test_toolset_enable_disable_attr_cover_every_toolset() -> None:
@@ -55,14 +56,36 @@ async def test_toolsets_match_server_tools(env_setup):
 
         # Get all tools from the server
         server_tools = await dbt_mcp.list_tools()
-        # Manually adding SQL tools here because the server doesn't get them
-        # in this unit test.
-        server_tool_names = {tool.name for tool in server_tools} | {
-            p.value for p in proxied_tools
+        enabled_tools = set(config.enable_tools) if config.enable_tools is not None else None
+        disabled_tools = set(config.disable_tools or [])
+        enabled_toolsets = config.enabled_toolsets
+        disabled_toolsets = config.disabled_toolsets
+
+        expected_proxied = {
+            p.value
+            for p in proxied_tools
+            if should_register_tool(
+                tool_name=p,
+                enabled_tools=enabled_tools,
+                disabled_tools=disabled_tools,
+                enabled_toolsets=enabled_toolsets,
+                disabled_toolsets=disabled_toolsets,
+                tool_to_toolset=TOOL_TO_TOOLSET,
+            )
         }
-        defined_tools = set()
-        for toolset_tools in toolsets.values():
-            defined_tools.update({t.value for t in toolset_tools})
+        server_tool_names = {tool.name for tool in server_tools} | expected_proxied
+        defined_tools = {
+            tool.value
+            for tool in TOOL_TO_TOOLSET
+            if should_register_tool(
+                tool_name=tool,
+                enabled_tools=enabled_tools,
+                disabled_tools=disabled_tools,
+                enabled_toolsets=enabled_toolsets,
+                disabled_toolsets=disabled_toolsets,
+                tool_to_toolset=TOOL_TO_TOOLSET,
+            )
+        }
 
         if server_tool_names != defined_tools:
             raise ValueError(

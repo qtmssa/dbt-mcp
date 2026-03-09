@@ -54,8 +54,8 @@ class LSPClientProvider(Protocol):
     lazy initialization, lifecycle management, etc.
     """
 
-    async def get_client(self) -> LSPClientProtocol:
-        """Get or create an LSPClient instance.
+    async def get_client(self, project_dir: str) -> LSPClientProtocol:
+        """Get or create an LSPClient instance for a project directory.
 
         Returns:
             An object implementing LSPClientProtocol (typically LSPClient)

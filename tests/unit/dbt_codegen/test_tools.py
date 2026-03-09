@@ -1,5 +1,6 @@
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 from pytest import MonkeyPatch
@@ -22,7 +23,7 @@ def mock_process():
 
 
 def test_generate_source_basic_schema(
-    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path
 ):
     """Test generate_source with just schema_name parameter."""
     mock_calls = []
@@ -48,6 +49,7 @@ def test_generate_source_basic_schema(
 
     # Call with just schema_name (provide all required args explicitly)
     generate_source_tool(
+        project_path=project_path,
         schema_name="raw_data",
         database_name=None,
         table_names=None,
@@ -60,7 +62,7 @@ def test_generate_source_basic_schema(
     args_list = mock_calls[0]
 
     # Check basic command structure
-    assert args_list[0] == "/path/to/dbt"
+    assert args_list[0] == mock_dbt_codegen_config.dbt_path
     assert "--no-use-colors" in args_list
     assert "run-operation" in args_list
     assert "--quiet" in args_list
@@ -74,7 +76,7 @@ def test_generate_source_basic_schema(
 
 
 def test_generate_source_with_all_parameters(
-    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path
 ):
     """Test generate_source with all parameters."""
     mock_calls = []
@@ -98,6 +100,7 @@ def test_generate_source_with_all_parameters(
 
     # Call with all parameters
     generate_source_tool(
+        project_path=project_path,
         schema_name="raw_data",
         database_name="analytics",
         table_names=["users", "orders"],
@@ -118,7 +121,9 @@ def test_generate_source_with_all_parameters(
     assert args_json["include_descriptions"] is True
 
 
-def test_generate_model_yaml(monkeypatch: MonkeyPatch, mock_process, mock_fastmcp):
+def test_generate_model_yaml(
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path
+):
     """Test generate_model_yaml function."""
     mock_calls = []
 
@@ -141,6 +146,7 @@ def test_generate_model_yaml(monkeypatch: MonkeyPatch, mock_process, mock_fastmc
 
     # Call the tool
     generate_model_yaml_tool(
+        project_path=project_path,
         model_names=["stg_users", "stg_orders"],
         upstream_descriptions=True,
         include_data_types=False,
@@ -158,7 +164,9 @@ def test_generate_model_yaml(monkeypatch: MonkeyPatch, mock_process, mock_fastmc
     assert args_json["include_data_types"] is False
 
 
-def test_generate_staging_model(monkeypatch: MonkeyPatch, mock_process, mock_fastmcp):
+def test_generate_staging_model(
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path
+):
     """Test generate_staging_model function."""
     mock_calls = []
 
@@ -181,6 +189,7 @@ def test_generate_staging_model(monkeypatch: MonkeyPatch, mock_process, mock_fas
 
     # Call the tool
     generate_staging_model_tool(
+        project_path=project_path,
         source_name="raw_data",
         table_name="users",
         leading_commas=True,
@@ -203,7 +212,9 @@ def test_generate_staging_model(monkeypatch: MonkeyPatch, mock_process, mock_fas
     assert args_json["materialized"] == "view"
 
 
-def test_codegen_error_handling_missing_package(monkeypatch: MonkeyPatch, mock_fastmcp):
+def test_codegen_error_handling_missing_package(
+    monkeypatch: MonkeyPatch, mock_fastmcp, project_path
+):
     """Test error handling when dbt-codegen package is not installed."""
     mock_calls = []
 
@@ -233,6 +244,7 @@ def test_codegen_error_handling_missing_package(monkeypatch: MonkeyPatch, mock_f
 
     # Call should return error message about missing package
     result = generate_source_tool(
+        project_path=project_path,
         schema_name="test_schema",
         database_name=None,
         table_names=None,
@@ -244,7 +256,9 @@ def test_codegen_error_handling_missing_package(monkeypatch: MonkeyPatch, mock_f
     assert "Run 'dbt deps'" in result
 
 
-def test_codegen_error_handling_general_error(monkeypatch: MonkeyPatch, mock_fastmcp):
+def test_codegen_error_handling_general_error(
+    monkeypatch: MonkeyPatch, mock_fastmcp, project_path
+):
     """Test general error handling."""
     mock_calls = []
 
@@ -274,6 +288,7 @@ def test_codegen_error_handling_general_error(monkeypatch: MonkeyPatch, mock_fas
 
     # Call should return the error
     result = generate_source_tool(
+        project_path=project_path,
         schema_name="test_schema",
         database_name=None,
         table_names=None,
@@ -285,7 +300,9 @@ def test_codegen_error_handling_general_error(monkeypatch: MonkeyPatch, mock_fas
     assert "Some other error occurred" in result
 
 
-def test_codegen_timeout_handling(monkeypatch: MonkeyPatch, mock_fastmcp):
+def test_codegen_timeout_handling(
+    monkeypatch: MonkeyPatch, mock_fastmcp, project_path
+):
     """Test timeout handling for long-running operations."""
 
     class MockProcessWithTimeout:
@@ -310,6 +327,7 @@ def test_codegen_timeout_handling(monkeypatch: MonkeyPatch, mock_fastmcp):
 
     # Test timeout case
     result = generate_source_tool(
+        project_path=project_path,
         schema_name="large_schema",
         database_name=None,
         table_names=None,
@@ -320,7 +338,9 @@ def test_codegen_timeout_handling(monkeypatch: MonkeyPatch, mock_fastmcp):
     assert "10 seconds" in result
 
 
-def test_quiet_flag_placement(monkeypatch: MonkeyPatch, mock_process, mock_fastmcp):
+def test_quiet_flag_placement(
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path
+):
     """Test that --quiet flag is placed correctly in the command."""
     mock_calls = []
 
@@ -343,6 +363,7 @@ def test_quiet_flag_placement(monkeypatch: MonkeyPatch, mock_process, mock_fastm
 
     # Call the tool
     generate_source_tool(
+        project_path=project_path,
         schema_name="test",
         database_name=None,
         table_names=None,
@@ -361,7 +382,9 @@ def test_quiet_flag_placement(monkeypatch: MonkeyPatch, mock_process, mock_fastm
     assert quiet_index == run_op_index + 1
 
 
-def test_absolute_path_handling(monkeypatch: MonkeyPatch, mock_process, mock_fastmcp):
+def test_absolute_path_handling(
+    monkeypatch: MonkeyPatch, mock_process, mock_fastmcp, project_path
+):
     """Test that absolute paths are handled correctly."""
     mock_calls = []
     captured_kwargs = {}
@@ -386,6 +409,7 @@ def test_absolute_path_handling(monkeypatch: MonkeyPatch, mock_process, mock_fas
 
     # Call the tool (mock config has /test/project which is absolute)
     generate_source_tool(
+        project_path=project_path,
         schema_name="test",
         database_name=None,
         table_names=None,
@@ -395,7 +419,8 @@ def test_absolute_path_handling(monkeypatch: MonkeyPatch, mock_process, mock_fas
 
     # Verify cwd was set for absolute path
     assert "cwd" in captured_kwargs
-    assert captured_kwargs["cwd"] == "/test/project"
+    expected_cwd = str(Path(mock_dbt_codegen_config.project_root_dir) / project_path)
+    assert captured_kwargs["cwd"] == expected_cwd
 
 
 def test_all_tools_registered(mock_fastmcp):

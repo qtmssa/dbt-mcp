@@ -40,3 +40,8 @@ TYPES_FIELD = Field(
     "If not provided, includes all types. "
     "Valid types: Model, Source, Seed, Snapshot, Exposure, Metric, SemanticModel, SavedQuery, Test.",
 )
+
+PROJECT_PATH_FIELD = Field(
+    description="Project path relative to DBT_PROJECT_ROOT_DIR. "
+    "Must be a subdirectory containing the project files.",
+)
