@@ -1,6 +1,8 @@
 import logging
+import os
 import shutil
 import socket
+import sys
 import time
 from enum import Enum
 from pathlib import Path
@@ -35,6 +37,91 @@ logger = logging.getLogger(__name__)
 OAUTH_REDIRECT_STARTING_PORT = 6785
 DEFAULT_DBT_CLI_TIMEOUT = 60
 DEFAULT_MF_CLI_TIMEOUT = 60
+
+
+def _strip_or_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = str(value).strip()
+    return stripped or None
+
+
+def _iter_candidate_binary_dirs() -> list[Path]:
+    candidates: list[Path] = []
+
+    exe_dir = Path(sys.executable).resolve().parent
+    candidates.append(exe_dir)
+    if os.name != "nt":
+        candidates.append(exe_dir / "bin")
+
+    if os.name == "nt":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            candidates.extend(
+                Path(local_app_data).glob("Programs/Python/Python*/Scripts")
+            )
+        app_data = os.environ.get("APPDATA")
+        if app_data:
+            candidates.extend(Path(app_data).glob("Python/Python*/Scripts"))
+
+    deduped: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        resolved = candidate.expanduser()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        deduped.append(resolved)
+    return deduped
+
+
+def _discover_binary(*names: str) -> str | None:
+    for name in names:
+        found = shutil.which(name)
+        if found:
+            return found
+
+    suffixes = [""]
+    if os.name == "nt":
+        suffixes = ["", ".exe", ".cmd", ".bat"]
+
+    for candidate_dir in _iter_candidate_binary_dirs():
+        for name in names:
+            name_path = Path(name)
+            stem = name_path.name
+            base_names = {stem}
+            if name_path.suffix:
+                base_names.add(name_path.stem)
+            for base_name in base_names:
+                for suffix in suffixes:
+                    candidate = candidate_dir / f"{base_name}{suffix}"
+                    if candidate.exists():
+                        return str(candidate)
+    return None
+
+
+def _autofill_binary_path(
+    value: str | None,
+    *,
+    env_name: str,
+    command_names: tuple[str, ...],
+) -> str:
+    stripped = _strip_or_none(value)
+    if stripped is not None:
+        return stripped
+
+    discovered = _discover_binary(*command_names)
+    if discovered:
+        logger.info("%s was blank; auto-detected executable at %s", env_name, discovered)
+        return discovered
+
+    fallback = command_names[0]
+    logger.warning(
+        "%s was blank and no executable was auto-detected; falling back to '%s'.",
+        env_name,
+        fallback,
+    )
+    return fallback
 
 
 class AuthenticationMethod(Enum):
@@ -273,44 +360,82 @@ class DbtMcpSettings(BaseSettings):
 
     @field_validator("dbt_path", mode="after")
     @classmethod
-    def validate_file_exists(cls, v: str | None, info: ValidationInfo) -> str | None:
-        """Validate a path exists in the system.
+    def normalize_existing_dbt_path(
+        cls, v: str | None, info: ValidationInfo
+    ) -> str | None:
+        """Normalize explicit dbt paths without failing early.
 
-        This will only fail if the path is explicitly set to a non-existing path.
-        It will auto-disable upon model validation if it can't be found AND it's not $PATH.
+        Invalid paths are handled later by auto-disable or startup error handling.
         """
-        # Allow 'dbt' and 'dbtf' as special cases as they're expected to be on PATH
         if v in ["dbt", "dbtf"]:
             return v
         if v:
             p = Path(v).expanduser()
             if p.exists():
                 return str(p)
-
-            field_name = (
-                getattr(info, "field_name", "None") if info is not None else "None"
-            ).upper()
-            raise ValueError(f"{field_name} path does not exist: {v}")
         return v
+
+    @field_validator("dbt_path", mode="before")
+    @classmethod
+    def autofill_blank_dbt_path(cls, v: str | None) -> str:
+        return _autofill_binary_path(
+            v,
+            env_name="DBT_PATH",
+            command_names=("dbt", "dbtf"),
+        )
 
     @field_validator("mf_path", mode="after")
     @classmethod
-    def validate_mf_path_exists(cls, v: str | None, info: ValidationInfo) -> str | None:
-        """Validate the mf binary path exists in the system."""
+    def normalize_existing_mf_path(
+        cls, v: str | None, info: ValidationInfo
+    ) -> str | None:
+        """Normalize explicit mf paths without failing early."""
         if v in ["mf"]:
             return v
         if v:
             p = Path(v).expanduser()
             if p.exists():
                 return str(p)
-
-            field_name = (
-                getattr(info, "field_name", "None") if info is not None else "None"
-            ).upper()
-            raise ValueError(f"{field_name} path does not exist: {v}")
         return v
 
-    @field_validator("dbt_project_root_dir", "dbt_profiles_dir", mode="after")
+    @field_validator("mf_path", mode="before")
+    @classmethod
+    def autofill_blank_mf_path(cls, v: str | None) -> str:
+        return _autofill_binary_path(
+            v,
+            env_name="MF_PATH",
+            command_names=("mf",),
+        )
+
+    @field_validator("dbt_project_root_dir", mode="after")
+    @classmethod
+    def ensure_project_root_dir_exists(
+        cls, v: str | None, info: ValidationInfo
+    ) -> str | None:
+        """Ensure DBT_PROJECT_ROOT_DIR exists, creating it when possible."""
+        if v:
+            path = Path(v).expanduser()
+            if not path.is_absolute():
+                path = (Path.cwd() / path).resolve()
+            else:
+                path = path.resolve()
+            if path.exists() and not path.is_dir():
+                field_name = (
+                    getattr(info, "field_name", "None") if info is not None else "None"
+                ).upper()
+                raise ValueError(f"{field_name} is not a directory: {v}")
+            if not path.exists():
+                try:
+                    path.mkdir(parents=True, exist_ok=True)
+                    logger.info("Created missing DBT_PROJECT_ROOT_DIR: %s", path)
+                except OSError as exc:
+                    raise ValueError(
+                        f"DBT_PROJECT_ROOT_DIR could not be created: {path} ({exc})"
+                    ) from exc
+            return str(path)
+        return v
+
+    @field_validator("dbt_profiles_dir", mode="after")
     @classmethod
     def validate_dir_exists(cls, v: str | None, info: ValidationInfo) -> str | None:
         """Validate a directory path exists in the system."""

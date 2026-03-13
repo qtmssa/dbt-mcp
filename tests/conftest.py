@@ -49,27 +49,37 @@ def env_setup(tmp_path: Path, monkeypatch):
         env_vars: dict[str, str] | None = None, files: dict[str, str] | None = None
     ):
         override_root_dir = (env_vars or {}).get("DBT_PROJECT_ROOT_DIR")
-        root_dir_value = override_root_dir or get_env_value("DBT_PROJECT_ROOT_DIR")
+        root_dir_value = override_root_dir or os.environ.get("DBT_PROJECT_ROOT_DIR")
         root_dir = Path(root_dir_value) if root_dir_value else (tmp_path / "projects")
         root_dir.mkdir(parents=True, exist_ok=True)
         project_name = f"test_project_{tmp_path.name}"
         project_dir = root_dir / project_name
         project_dir.mkdir(parents=True, exist_ok=True)
 
-        dbt_path_value = get_env_value("DBT_PATH", "dbt")
-        mf_path_value = get_env_value("MF_PATH", "mf")
+        dbt_path_value = os.environ.get("DBT_PATH", "dbt")
+        mf_path_value = os.environ.get("MF_PATH", "mf")
         path_plus_tmp_path = os.environ.get("PATH", "")
         created_fake_binaries = []
         if dbt_path_value == "dbt" or mf_path_value == "mf":
-            # a placeholder dbt/mf file if PATH lookup is needed
-            dbt_path = tmp_path / "dbt"
-            mf_path = tmp_path / "mf"
-            dbt_path.touch()
-            mf_path.touch()
-            created_fake_binaries.extend([dbt_path, mf_path])
+            if dbt_path_value == "dbt":
+                dbt_path = tmp_path / "dbt"
+                dbt_path.touch()
+                created_fake_binaries.append(dbt_path)
+                if os.name == "nt":
+                    dbt_cmd = tmp_path / "dbt.cmd"
+                    dbt_cmd.write_text("@echo off\r\nexit /b 0\r\n")
+                    created_fake_binaries.append(dbt_cmd)
+            if mf_path_value == "mf":
+                mf_path = tmp_path / "mf"
+                mf_path.touch()
+                created_fake_binaries.append(mf_path)
+                if os.name == "nt":
+                    mf_cmd = tmp_path / "mf.cmd"
+                    mf_cmd.write_text("@echo off\r\nexit /b 0\r\n")
+                    created_fake_binaries.append(mf_cmd)
             try:
-                dbt_path.chmod(0o755)
-                mf_path.chmod(0o755)
+                for fake_binary in created_fake_binaries:
+                    fake_binary.chmod(0o755)
             except Exception:
                 pass
             path_plus_tmp_path = path_plus_tmp_path + os.pathsep + str(tmp_path)

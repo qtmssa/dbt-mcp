@@ -1,4 +1,6 @@
+import os
 import subprocess
+import shutil
 from enum import Enum
 
 from dbt_mcp.errors import BinaryExecutionError
@@ -8,6 +10,36 @@ class BinaryType(Enum):
     DBT_CORE = "dbt_core"
     FUSION = "fusion"
     DBT_CLOUD_CLI = "dbt_cloud_cli"
+
+
+def resolve_dbt_binary(file_path: str) -> str:
+    executable = shutil.which(file_path)
+    if executable:
+        return executable
+
+    expanded = os.path.expanduser(file_path)
+    if os.path.exists(expanded):
+        return expanded
+
+    raise BinaryExecutionError(f"DBT_PATH executable can't be found: {file_path}")
+
+
+def _dbt_help_args(executable: str) -> list[str]:
+    if os.name == "nt" and executable.lower().endswith((".cmd", ".bat")):
+        return ["cmd", "/c", executable, "--help"]
+    return [executable, "--help"]
+
+
+def _raise_help_failure(file_path: str, result: subprocess.CompletedProcess[str]) -> None:
+    details = (result.stderr or result.stdout or "").strip()
+    if details:
+        raise BinaryExecutionError(
+            f"Cannot execute binary {file_path}: --help exited with code "
+            f"{result.returncode}: {details}"
+        )
+    raise BinaryExecutionError(
+        f"Cannot execute binary {file_path}: --help exited with code {result.returncode}"
+    )
 
 
 def detect_binary_type(file_path: str) -> BinaryType:
@@ -24,15 +56,20 @@ def detect_binary_type(file_path: str) -> BinaryType:
         Exception: If the binary cannot be executed or accessed
     """
     try:
+        executable = resolve_dbt_binary(file_path)
         result = subprocess.run(
-            [file_path, "--help"],
+            _dbt_help_args(executable),
             check=False,
             capture_output=True,
             text=True,
             timeout=60,
         )
-        help_output = result.stdout
+        if result.returncode != 0:
+            _raise_help_failure(file_path, result)
+        help_output = result.stdout or result.stderr
     except Exception as e:
+        if isinstance(e, BinaryExecutionError):
+            raise
         raise BinaryExecutionError(f"Cannot execute binary {file_path}: {e}")
 
     if not help_output:

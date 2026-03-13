@@ -21,6 +21,11 @@ cd dbt-mcp
     cp .env.example .env
     ```
     Then edit `.env` with your specific environment variables (see [our docs](https://docs.getdbt.com/docs/dbt-ai/setup-local-mcp) to determine the values).
+    For local `dbt Core + MetricFlow` development, the recommended setup is:
+    - set `DBT_PROJECT_ROOT_DIR` to your project root container directory; if it does not exist yet, `dbt-mcp` will try to create it at startup
+    - leave `DBT_PATH` and `MF_PATH` blank unless you need to pin a specific executable
+    - leave dbt Platform variables commented out unless you are testing remote Platform tools
+    - because this repository now depends on `dbt-core`, `dbt-metricflow`, and `dbt-postgres`, blank `DBT_PATH` / `MF_PATH` will usually auto-resolve inside the project environment
 
 6. Run `task client` to chat with dbt MCP in your terminal.
 

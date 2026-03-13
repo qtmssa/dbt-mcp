@@ -10,3 +10,6 @@ dependencies = [
     "langchain[anthropic]>=0.3.27",
     "langgraph>=0.6.4",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.0"]

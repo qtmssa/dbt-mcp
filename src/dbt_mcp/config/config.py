@@ -1,3 +1,4 @@
+import logging
 import os
 from dataclasses import dataclass
 
@@ -13,13 +14,15 @@ from dbt_mcp.config.settings import (
     DbtMcpLogSettings,
 )
 from dbt_mcp.config.transport import validate_transport
-from dbt_mcp.dbt_cli.binary_type import BinaryType, detect_binary_type
+from dbt_mcp.dbt_cli.binary_type import BinaryType, detect_binary_type, resolve_dbt_binary
 from dbt_mcp.lsp.lsp_binary_manager import LspBinaryInfo, dbt_lsp_binary_info
+from dbt_mcp.metricflow.binary import validate_metricflow_binary
 from dbt_mcp.telemetry.logging import configure_logging
 from dbt_mcp.tools.tool_names import ToolName
 from dbt_mcp.tools.toolsets import Toolset
 
 PACKAGE_NAME = "dbt-mcp"
+logger = logging.getLogger(__name__)
 
 TOOLSET_TO_DISABLE_ATTR = {
     Toolset.SEMANTIC_LAYER: "disable_semantic_layer",
@@ -141,31 +144,68 @@ def load_config(enable_proxied_tools: bool = True) -> Config:
             credentials_provider=credentials_provider,
         )
 
+    resolved_dbt_path = None
+    dbt_binary_type = None
+    if (
+        settings.dbt_project_root_dir
+        and settings.dbt_path
+        and (not settings.disable_dbt_cli or not settings.disable_dbt_codegen)
+    ):
+        resolved_dbt_path = resolve_dbt_binary(settings.dbt_path)
+        dbt_binary_type = detect_binary_type(settings.dbt_path)
+        logger.info(
+            "Discovered DBT_PATH=%s exists=%s help_check=%s binary_type=%s",
+            resolved_dbt_path,
+            True,
+            "ok",
+            dbt_binary_type.value,
+        )
+
     dbt_cli_config = None
-    if settings.dbt_project_root_dir and settings.dbt_path:
-        binary_type = detect_binary_type(settings.dbt_path)
+    if (
+        not settings.disable_dbt_cli
+        and settings.dbt_project_root_dir
+        and settings.dbt_path
+    ):
         dbt_cli_config = DbtCliConfig(
             project_root_dir=settings.dbt_project_root_dir,
-            dbt_path=settings.dbt_path,
+            dbt_path=resolved_dbt_path or settings.dbt_path,
             dbt_cli_timeout=settings.dbt_cli_timeout,
-            binary_type=binary_type,
+            binary_type=dbt_binary_type or detect_binary_type(settings.dbt_path),
         )
 
     dbt_codegen_config = None
-    if settings.dbt_project_root_dir and settings.dbt_path:
-        binary_type = detect_binary_type(settings.dbt_path)
+    if (
+        not settings.disable_dbt_codegen
+        and settings.dbt_project_root_dir
+        and settings.dbt_path
+    ):
         dbt_codegen_config = DbtCodegenConfig(
             project_root_dir=settings.dbt_project_root_dir,
-            dbt_path=settings.dbt_path,
+            dbt_path=resolved_dbt_path or settings.dbt_path,
             dbt_cli_timeout=settings.dbt_cli_timeout,
-            binary_type=binary_type,
+            binary_type=dbt_binary_type or detect_binary_type(settings.dbt_path),
         )
 
     metricflow_config = None
-    if settings.dbt_project_root_dir and settings.mf_path:
+    if (
+        settings.dbt_project_root_dir
+        and settings.mf_path
+        and (
+            not settings.disable_metricflow_cli
+            or not settings.disable_metricflow_project_files
+        )
+    ):
+        resolved_mf_path = validate_metricflow_binary(settings.mf_path)
+        logger.info(
+            "Discovered MF_PATH=%s exists=%s help_check=%s",
+            resolved_mf_path,
+            True,
+            "ok",
+        )
         metricflow_config = MetricflowConfig(
             project_root_dir=settings.dbt_project_root_dir,
-            mf_path=settings.mf_path,
+            mf_path=resolved_mf_path,
             mf_cli_timeout=settings.mf_cli_timeout,
         )
 

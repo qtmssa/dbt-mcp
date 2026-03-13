@@ -13,7 +13,12 @@ def resolve_project_root(root_dir: str) -> Path:
     else:
         root = root.resolve()
     if not root.exists():
-        raise ValueError(f"DBT_PROJECT_ROOT_DIR does not exist: {root}")
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise ValueError(
+                f"DBT_PROJECT_ROOT_DIR could not be created: {root} ({exc})"
+            ) from exc
     if not root.is_dir():
         raise ValueError(f"DBT_PROJECT_ROOT_DIR is not a directory: {root}")
     return root

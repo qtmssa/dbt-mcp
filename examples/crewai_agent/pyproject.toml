@@ -8,3 +8,6 @@ dependencies = [
     "crewai>=1.8.0",
     "mcp>=1.16.0",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.0"]

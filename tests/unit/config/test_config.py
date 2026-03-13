@@ -265,6 +265,58 @@ class TestDbtMcpSettings:
             assert settings.disable_dbt_cli is True
             assert settings.disable_dbt_codegen is True
 
+    def test_creates_missing_dbt_project_root_dir(self, tmp_path):
+        missing_root = tmp_path / "new_root"
+        with patch.dict(
+            os.environ,
+            {"DBT_PROJECT_ROOT_DIR": str(missing_root), "DBT_HOST": "test.dbt.com"},
+            clear=True,
+        ):
+            settings = DbtMcpSettings(_env_file=None)
+
+        assert missing_root.is_dir()
+        assert settings.dbt_project_root_dir == str(missing_root.resolve())
+
+    def test_blank_dbt_path_is_auto_discovered(self, tmp_path):
+        discovered = tmp_path / "dbt.exe"
+        discovered.touch()
+        with (
+            patch("dbt_mcp.config.settings.shutil.which", return_value=str(discovered)),
+            patch.dict(os.environ, {"DBT_PATH": ""}, clear=True),
+        ):
+            settings = DbtMcpSettings(_env_file=None)
+
+        assert settings.dbt_path == str(discovered)
+
+    def test_blank_mf_path_is_auto_discovered(self, tmp_path):
+        discovered = tmp_path / "mf.exe"
+        discovered.touch()
+        with (
+            patch("dbt_mcp.config.settings.shutil.which", return_value=str(discovered)),
+            patch.dict(os.environ, {"MF_PATH": ""}, clear=True),
+        ):
+            settings = DbtMcpSettings(_env_file=None)
+
+        assert settings.mf_path == str(discovered)
+
+    def test_invalid_explicit_binary_paths_auto_disable_without_validation_crash(
+        self, tmp_path
+    ):
+        project_root = tmp_path / "projects"
+        env_vars = {
+            "DBT_PROJECT_ROOT_DIR": str(project_root),
+            "DBT_PATH": str(tmp_path / "missing_dbt.exe"),
+            "MF_PATH": str(tmp_path / "missing_mf.exe"),
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            settings = DbtMcpSettings(_env_file=None)
+
+        assert settings.disable_dbt_cli is True
+        assert settings.disable_dbt_codegen is True
+        assert settings.disable_metricflow_cli is True
+        assert settings.disable_metricflow_project_files is True
+
 
 class TestLoadConfig:
     def setup_method(self):
@@ -414,6 +466,65 @@ class TestLoadConfig:
 
         assert config.semantic_layer_config_provider is not None
 
+    def test_load_config_validates_metricflow_binary(self, env_setup):
+        with (
+            env_setup(),
+            patch(
+                "dbt_mcp.config.config.resolve_dbt_binary",
+                return_value="dbt",
+            ),
+            patch(
+                "dbt_mcp.config.config.detect_binary_type",
+                return_value=BinaryType.DBT_CORE,
+            ),
+            patch(
+                "dbt_mcp.config.config.validate_metricflow_binary",
+                return_value="resolved-mf",
+            ) as mock_validate,
+        ):
+            config = load_config()
+
+            assert config.metricflow_config is not None
+            mock_validate.assert_called_once_with("mf")
+            assert config.metricflow_config.mf_path == "resolved-mf"
+
+    def test_load_config_logs_detected_binary_paths(self, env_setup):
+        with (
+            env_setup(),
+            patch(
+                "dbt_mcp.config.config.resolve_dbt_binary",
+                return_value="/resolved/dbt",
+            ),
+            patch(
+                "dbt_mcp.config.config.detect_binary_type",
+                return_value=BinaryType.DBT_CORE,
+            ),
+            patch(
+                "dbt_mcp.config.config.validate_metricflow_binary",
+                return_value="/resolved/mf",
+            ),
+            patch("dbt_mcp.config.config.logger") as mock_logger,
+        ):
+            config = load_config()
+
+        assert config.dbt_cli_config is not None
+        assert config.dbt_cli_config.dbt_path == "/resolved/dbt"
+        assert config.metricflow_config is not None
+        assert config.metricflow_config.mf_path == "/resolved/mf"
+        mock_logger.info.assert_any_call(
+            "Discovered DBT_PATH=%s exists=%s help_check=%s binary_type=%s",
+            "/resolved/dbt",
+            True,
+            "ok",
+            "dbt_core",
+        )
+        mock_logger.info.assert_any_call(
+            "Discovered MF_PATH=%s exists=%s help_check=%s",
+            "/resolved/mf",
+            True,
+            "ok",
+        )
+
     def test_warn_error_options_default_setting(self):
         env_vars = {
             "DBT_TOKEN": "test_token",
@@ -551,3 +662,18 @@ class TestLoadConfig:
 
         config = self._load_config_with_env(env_vars)
         assert config.mcp_server_config.transport == "sse"
+
+    def test_load_config_skips_disabled_local_configs_for_invalid_binary_paths(
+        self, tmp_path
+    ):
+        project_root = tmp_path / "projects"
+        env_vars = {
+            "DBT_PROJECT_ROOT_DIR": str(project_root),
+            "DBT_PATH": str(tmp_path / "missing_dbt.exe"),
+            "MF_PATH": str(tmp_path / "missing_mf.exe"),
+        }
+
+        config = self._load_config_with_env(env_vars)
+        assert config.dbt_cli_config is None
+        assert config.dbt_codegen_config is None
+        assert config.metricflow_config is None

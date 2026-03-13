@@ -5,3 +5,6 @@ description = "A simple example of using this MCP server with OpenAI Agents"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = ["openai-agents>=0.1.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.0"]

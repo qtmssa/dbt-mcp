@@ -39,6 +39,42 @@ FASTMCP_PORT=8000
 DBT_MCP_API_KEY=your-api-key
 ```
 
+## Recommended Local .env
+
+For local `dbt Core + MetricFlow` usage, the recommended setup is:
+
+- Set `DBT_PROJECT_ROOT_DIR` to the directory that stores your dbt projects. If it does not exist yet, `dbt-mcp` will try to create it at startup.
+- Leave `DBT_PATH` and `MF_PATH` blank unless you need a specific executable path. `dbt-mcp` will try to auto-detect them from `PATH`, the current Python environment, and common Windows Python `Scripts` directories.
+- At startup, `dbt-mcp` logs the discovered `DBT_PATH` and `MF_PATH` only after confirming the executable exists and `--help` returns successfully.
+- Keep dbt Platform variables such as `DBT_HOST`, `DBT_TOKEN`, and `DBT_PROD_ENV_ID` unset unless you want remote Platform tools.
+- This repository now declares `dbt-core`, `dbt-metricflow`, and `dbt-postgres` as dependencies, so when you run inside the project environment, blank `DBT_PATH` and `MF_PATH` will usually work.
+
+Example:
+
+```bash
+MCP_TRANSPORT=streamable-http
+FASTMCP_HOST=127.0.0.1
+FASTMCP_PORT=8000
+
+DBT_PROJECT_ROOT_DIR=./dbt_projects
+DBT_PATH=
+MF_PATH=
+DBT_CLI_TIMEOUT=60
+MF_CLI_TIMEOUT=60
+
+DBT_MCP_ENABLE_DBT_CLI=true
+DBT_MCP_ENABLE_METRICFLOW_CLI=true
+DBT_MCP_ENABLE_METRICFLOW_PROJECT_FILES=true
+DBT_MCP_ENABLE_DBT_CODEGEN=false
+DBT_MCP_ENABLE_LSP=false
+DBT_MCP_ENABLE_SEMANTIC_LAYER=false
+DBT_MCP_ENABLE_DISCOVERY=false
+DBT_MCP_ENABLE_SQL=false
+DBT_MCP_ENABLE_ADMIN_API=false
+DBT_MCP_ENABLE_MCP_SERVER_METADATA=true
+DISABLE_MCP_SERVER_METADATA=false
+```
+
 ## Tools
 
 ### SQL
