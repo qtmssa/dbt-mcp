@@ -1,0 +1,368 @@
+{
+  "项目": "dbt-mcp",
+  "显示名": "dbt-mcp",
+  "生成时间": "2026-03-15T13:52:54",
+  "来源根目录": "/raid/ai/metric/pr/codex/2026",
+  "需求总数": 8,
+  "当前有效需求数": 8,
+  "已过时需求数": 0,
+  "已实现需求数": 2,
+  "未归类会话数": 2,
+  "需求": [
+    {
+      "需求编号": "需求-01",
+      "标题": "梳理 dbt CLI 封装结构与调用方式",
+      "时效状态": "有效",
+      "实现状态": "已落地",
+      "所属阶段": {
+        "标识": "d1",
+        "标题": "工具能力封装"
+      },
+      "需求描述": "理解项目如何封装 dbt CLI，并以此为基础扩展更多工具能力。",
+      "业务目标": "建立后续扩展 MetricFlow 工具的认知基础。",
+      "需求依据": [
+        "请你分析这个项目（dbt-mcp）的代码，它是如何封装dbt cli的各项命令的？",
+        "与 dbt cli 的封装方式保持一致。",
+        "请问：dbt-mcp支持metricflow吗？",
+        "需要支持 mf validate-configs 功能，如何做？"
+      ],
+      "边界与非目标": [],
+      "实现约束": [],
+      "已确认决策": [],
+      "验收标准": [],
+      "问题与修复": [],
+      "替代哪些需求": [],
+      "被哪个需求替代": null,
+      "时效说明": "",
+      "相关模块": [
+        "src/dbt_mcp/dbt_cli",
+        "config"
+      ],
+      "来源会话": [
+        {
+          "日期": "2026-02-13",
+          "会话标识": "019c52af-b770-7501-b25c-2c00d59a40ac",
+          "标题": "分析这个项目（dbt-mcp）的代码，它是如何封装dbt cli的各项命令的？",
+          "来源路径": "/raid/ai/metric/pr/codex/2026/02/13/rollout-2026-02-13T00-29-33-019c52af-b770-7501-b25c-2c00d59a40ac.jsonl"
+        }
+      ]
+    },
+    {
+      "需求编号": "需求-02",
+      "标题": "将 MetricFlow CLI 封装为 MCP 工具",
+      "时效状态": "有效",
+      "实现状态": "进行中",
+      "所属阶段": {
+        "标识": "d1",
+        "标题": "工具能力封装"
+      },
+      "需求描述": "把 MetricFlow CLI 相关命令封装为 MCP 工具，并保持与 dbt CLI 风格一致。",
+      "业务目标": "补齐对 MetricFlow 的远程可调用能力。",
+      "需求依据": [],
+      "边界与非目标": [],
+      "实现约束": [],
+      "已确认决策": [],
+      "验收标准": [],
+      "问题与修复": [],
+      "替代哪些需求": [],
+      "被哪个需求替代": null,
+      "时效说明": "",
+      "相关模块": [
+        "src/dbt_mcp/metricflow/tools.py",
+        "tests"
+      ],
+      "来源会话": []
+    },
+    {
+      "需求编号": "需求-03",
+      "标题": "增加并调整 MetricFlow 项目文件工具",
+      "时效状态": "有效",
+      "实现状态": "进行中",
+      "所属阶段": {
+        "标识": "d1",
+        "标题": "工具能力封装"
+      },
+      "需求描述": "围绕读取、上传、删除 MetricFlow 项目文件形成独立工具集。",
+      "业务目标": "让上层流程可以直接操控项目文件。",
+      "需求依据": [
+        "将 mcp工具upload_project_zip 改成 upload_project_zip_url，使用url来下载zip文件。",
+        "mf list-project-files read-only",
+        "mf read-project-file read-only",
+        "mf delete-project-path destructive ❯",
+        "去掉如下工具："
+      ],
+      "边界与非目标": [],
+      "实现约束": [],
+      "已确认决策": [],
+      "验收标准": [],
+      "问题与修复": [],
+      "替代哪些需求": [],
+      "被哪个需求替代": null,
+      "时效说明": "",
+      "相关模块": [
+        "metricflow file tools",
+        "prompts"
+      ],
+      "来源会话": [
+        {
+          "日期": "2026-02-18",
+          "会话标识": "019c6cc2-e75a-77d1-ac14-e77ad82cc959",
+          "标题": "去掉如下工具：",
+          "来源路径": "/raid/ai/metric/pr/codex/2026/02/18/rollout-2026-02-18T02-00-38-019c6cc2-e75a-77d1-ac14-e77ad82cc959.jsonl"
+        },
+        {
+          "日期": "2026-02-19",
+          "会话标识": "019c75c7-1f40-77d1-a17a-249416536afa",
+          "标题": "上传文件的接口改一下，只需要接收一个url，然后自己下载解压",
+          "来源路径": "/raid/ai/metric/pr/codex/2026/02/19/rollout-2026-02-19T20-01-49-019c75c7-1f40-77d1-a17a-249416536afa.jsonl"
+        }
+      ]
+    },
+    {
+      "需求编号": "需求-04",
+      "标题": "增强 MCP 工具描述与文档说明",
+      "时效状态": "有效",
+      "实现状态": "进行中",
+      "所属阶段": {
+        "标识": "d1",
+        "标题": "工具能力封装"
+      },
+      "需求描述": "让所有工具都具有分层 description、参数说明和本地/远程模式说明。",
+      "业务目标": "提升 MCP client 的可发现性与正确调用率。",
+      "需求依据": [
+        "upload_project_zip_url，详细描述这个工具的功能。"
+      ],
+      "边界与非目标": [],
+      "实现约束": [],
+      "已确认决策": [],
+      "验收标准": [],
+      "问题与修复": [],
+      "替代哪些需求": [],
+      "被哪个需求替代": null,
+      "时效说明": "",
+      "相关模块": [
+        "README.md",
+        "prompts",
+        "tool metadata"
+      ],
+      "来源会话": [
+        {
+          "日期": "2026-02-24",
+          "会话标识": "019c8d1a-1285-7fd1-a82c-da4156ad565a",
+          "标题": "丰富 dbt mcp 的描述：",
+          "来源路径": "/raid/ai/metric/pr/codex/2026/02/24/rollout-2026-02-24T08-43-42-019c8d1a-1285-7fd1-a82c-da4156ad565a.jsonl"
+        }
+      ]
+    },
+    {
+      "需求编号": "需求-05",
+      "标题": "支持远程运行的 MCP 服务模式",
+      "时效状态": "有效",
+      "实现状态": "进行中",
+      "所属阶段": {
+        "标识": "d2",
+        "标题": "远程服务模式与配置模型"
+      },
+      "需求描述": "让 dbt-mcp 可以独立作为远程服务运行，并明确 transport、host、port 与 API Key 鉴权。",
+      "业务目标": "支持被上层系统远程调用。",
+      "需求依据": [
+        "使用http streamming，需要可配置host和port，使用api key方式鉴权",
+        "(venv) PS D:\\vsx\\github\\dbt-mcp> Get-ChildItem Env:MCP_TRANSPORT, Env:FASTMCP_HOST, Env:FASTMCP_PORT Get-ChildItem: Cannot find path 'MCP_TRANSPORT' because it does not exist. Get…",
+        "这样，我们改成 streamable-http 模式吧，这样就不用在 claude code 项目根目录启动 dbt-mcp 了",
+        "MCP_TRANSPORT在哪里定义的？",
+        "(venv) PS D:\\vsx\\github\\dbt-mcp> dbt-mcp WARNING [dbt_mcp.config.settings] Platform features have been automatically disabled due to missing DBT_HOST. INFO [dbt_mcp.mcp.server] Re…",
+        "0.0.1 -Port 9092 WARNING: TCP connect to (127.0.0.1 :"
+      ],
+      "边界与非目标": [
+        "我们应该复用fastmcp的环境变量，而不是重新定义自己的，除非fastmcp没有的部分",
+        "同时要执行“我们应该复用fastmcp的环境变量，而不是重新定义自己的，除非fastmcp没有的部分”"
+      ],
+      "实现约束": [],
+      "已确认决策": [],
+      "验收标准": [
+        "我把端口改成了 9092，然后在浏览器中访问 http://127.0.0.1:9092，显示服务器拒绝访问"
+      ],
+      "问题与修复": [],
+      "替代哪些需求": [],
+      "被哪个需求替代": null,
+      "时效说明": "",
+      "相关模块": [
+        "main.py",
+        "config",
+        "README.md"
+      ],
+      "来源会话": [
+        {
+          "日期": "2026-02-13",
+          "会话标识": "019c52ca-3d2d-7803-8b2f-11e23e24c625",
+          "标题": "需要增加一套mcp tool：",
+          "来源路径": "/raid/ai/metric/pr/codex/2026/02/13/rollout-2026-02-13T00-58-31-019c52ca-3d2d-7803-8b2f-11e23e24c625.jsonl"
+        },
+        {
+          "日期": "2026-02-13",
+          "会话标识": "019c5484-74a5-7212-b2ba-71448e43dbab",
+          "标题": "dbt-mcp是否必须跟dbt core运行在同一台机器上？",
+          "来源路径": "/raid/ai/metric/pr/codex/2026/02/13/rollout-2026-02-13T09-01-32-019c5484-74a5-7212-b2ba-71448e43dbab.jsonl"
+        }
+      ]
+    },
+    {
+      "需求编号": "需求-06",
+      "标题": "重构项目根目录与 project_path 模型",
+      "时效状态": "有效",
+      "实现状态": "进行中",
+      "所属阶段": {
+        "标识": "d2",
+        "标题": "远程服务模式与配置模型"
+      },
+      "需求描述": "用 `DBT_PROJECT_ROOT_DIR + project_path` 管理多项目，而不是单项目路径。",
+      "业务目标": "支持多项目并存和统一项目生命周期操作。",
+      "需求依据": [
+        "新增工具list_projects, is_project_exist, upload_project_zip, delete_project，归类到 DBT_MCP_ENABLE_METRICFLOW_PROJECT_FILES 中，允许client操作项目文件。",
+        "现在，把MF_PROJECT_DIR并入 DBT_PROJECT_DIR，这俩应该是同一个",
+        "所有的tool都需要传入 project_path来指定操作的具体项目，project_path是相对于DBT_PROJECT_ROOT_DIR 的子目录，里面存储的是真正的项目文件。",
+        "DBT_PROJECT_DIR environment variable is required when dbt CLI tools are enabled.. WARNING [dbt_mcp.config.settings] MetricFlow tools have been automatically disabled due to miscon…",
+        "我想把DBT_PROJECT_DIR环境变量去掉，把它放到每个tool的参数里面，这样要灵活一些。",
+        "现在，把MF_PATH 并入 DBT_PROJECT_DIR，这俩应该是同一个"
+      ],
+      "边界与非目标": [],
+      "实现约束": [],
+      "已确认决策": [],
+      "验收标准": [],
+      "问题与修复": [
+        {
+          "标题": "一旦发现项目已经存在，则立即报错。",
+          "现象": [
+            "一旦发现项目已经存在，则立即报错。"
+          ],
+          "根因": [
+            "多个 dbt/metricflow 工具相关单测报 `DBT_PROJECT_ROOT_DIR does not exist`，因为测试里用的根路径是假的目录（例如 `/test/projects`），而现在我们强校验根目录存在。"
+          ],
+          "处理": [
+            "提示文案：更新参数说明文本，避免提“环境变量”。",
+            "测试：全部用例改为显式传参，不再依赖 env。",
+            "未传时回退到 `DBT_PROJECT_DIR`。"
+          ],
+          "来源会话": [
+            {
+              "日期": "2026-02-17",
+              "会话标识": "019c6c4f-5ce0-7e11-bbe1-fdd44f99250e",
+              "来源路径": "/raid/ai/metric/pr/codex/2026/02/17/rollout-2026-02-17T23-54-26-019c6c4f-5ce0-7e11-bbe1-fdd44f99250e.jsonl"
+            }
+          ]
+        }
+      ],
+      "替代哪些需求": [],
+      "被哪个需求替代": null,
+      "时效说明": "",
+      "相关模块": [
+        "settings.py",
+        "toolsets",
+        "tests"
+      ],
+      "来源会话": [
+        {
+          "日期": "2026-02-17",
+          "会话标识": "019c6c4f-5ce0-7e11-bbe1-fdd44f99250e",
+          "标题": "现在，把MF_PATH 并入 DBT_PROJECT_DIR，这俩应该是同一个",
+          "来源路径": "/raid/ai/metric/pr/codex/2026/02/17/rollout-2026-02-17T23-54-26-019c6c4f-5ce0-7e11-bbe1-fdd44f99250e.jsonl"
+        },
+        {
+          "日期": "2026-02-18",
+          "会话标识": "019c6cc7-dcb9-7f71-98bf-3116e7ea5c32",
+          "标题": "INFO:",
+          "来源路径": "/raid/ai/metric/pr/codex/2026/02/18/rollout-2026-02-18T02-06-03-019c6cc7-dcb9-7f71-98bf-3116e7ea5c32.jsonl"
+        }
+      ]
+    },
+    {
+      "需求编号": "需求-07",
+      "标题": "明确环境变量模型与运行时加载行为",
+      "时效状态": "有效",
+      "实现状态": "已落地",
+      "所属阶段": {
+        "标识": "d2",
+        "标题": "远程服务模式与配置模型"
+      },
+      "需求描述": "梳理 `.env`、运行目录、工具集开关和本地/远程模式的实际加载方式。",
+      "业务目标": "避免环境配置误判。",
+      "需求依据": [
+        "详细介绍这些环境变量的含义",
+        "请你修改.env文件，做好对应的配置。",
+        "请你把本地运行可以打开的mcp工具在.env中都打开。"
+      ],
+      "边界与非目标": [],
+      "实现约束": [],
+      "已确认决策": [],
+      "验收标准": [],
+      "问题与修复": [],
+      "替代哪些需求": [],
+      "被哪个需求替代": null,
+      "时效说明": "",
+      "相关模块": [
+        "README.md",
+        ".env",
+        "config"
+      ],
+      "来源会话": [
+        {
+          "日期": "2026-02-13",
+          "会话标识": "019c54cd-8204-7163-8faf-874b26f0fc91",
+          "标题": "WARNING [dbt_mcp.config.settings] Ignorin…",
+          "来源路径": "/raid/ai/metric/pr/codex/2026/02/13/rollout-2026-02-13T10-21-20-019c54cd-8204-7163-8faf-874b26f0fc91.jsonl"
+        }
+      ]
+    },
+    {
+      "需求编号": "需求-08",
+      "标题": "修复测试、编码和运行时兼容性问题",
+      "时效状态": "有效",
+      "实现状态": "进行中",
+      "所属阶段": {
+        "标识": "d3",
+        "标题": "测试、兼容性与运行期修复"
+      },
+      "需求描述": "解决 pytest async、NameError、UnicodeDecodeError、旧安装版本与环境不一致等问题。",
+      "业务目标": "让项目具备稳定的测试与运行基础。",
+      "需求依据": [
+        "INFO [dbt_mcp.mcp.server] Toolset filters: enabled_toolsets=['dbt_cli', 'mcp_server_metadata', 'metricflow_cli', 'metricflow_project_files'] disabled_toolsets=['admin_api', 'dbt_c…",
+        "增加2个tool："
+      ],
+      "边界与非目标": [],
+      "实现约束": [],
+      "已确认决策": [],
+      "验收标准": [],
+      "问题与修复": [],
+      "替代哪些需求": [],
+      "被哪个需求替代": null,
+      "时效说明": "",
+      "相关模块": [
+        "tests",
+        "prompts.py",
+        "metricflow/tools.py"
+      ],
+      "来源会话": [
+        {
+          "日期": "2026-02-26",
+          "会话标识": "019c9652-108e-7622-ab60-cc3573f1a7bf",
+          "标题": "增加2个tool：",
+          "来源路径": "/raid/ai/metric/pr/codex/2026/02/26/rollout-2026-02-26T03-41-26-019c9652-108e-7622-ab60-cc3573f1a7bf.jsonl"
+        }
+      ]
+    }
+  ],
+  "未归类会话": [
+    {
+      "日期": "2026-02-18",
+      "会话标识": "019c6cbc-b2d6-7e92-9b13-1325f2244cf7",
+      "标题": "(venv) PS D:\\vsx\\github\\dbt-mcp> pip inst…",
+      "来源路径": "/raid/ai/metric/pr/codex/2026/02/18/rollout-2026-02-18T01-53-51-019c6cbc-b2d6-7e92-9b13-1325f2244cf7.jsonl"
+    },
+    {
+      "日期": "2026-02-19",
+      "会话标识": "019c75a3-92ba-7cc0-8ee5-d66afe0edfc1",
+      "标题": "mcp 如何传文件？",
+      "来源路径": "/raid/ai/metric/pr/codex/2026/02/19/rollout-2026-02-19T19-23-00-019c75a3-92ba-7cc0-8ee5-d66afe0edfc1.jsonl"
+    }
+  ]
+}
