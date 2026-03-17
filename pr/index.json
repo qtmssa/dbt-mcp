@@ -1,0 +1,227 @@
+{
+  "project": "dbt-mcp",
+  "generated_at": "2026-03-17",
+  "status_summary": {
+    "effective": 8,
+    "implemented": 2,
+    "obsolete": 0,
+    "uncategorized_sessions": 2
+  },
+  "sources": {
+    "human_indexes": [
+      "dbt-mcp/pr/00-项目基线.md",
+      "dbt-mcp/pr/01-当前有效需求索引.md",
+      "dbt-mcp/pr/02-已实现需求索引.md",
+      "dbt-mcp/pr/03-已过时需求索引.md",
+      "dbt-mcp/pr/04-问题与修复索引.md",
+      "dbt-mcp/pr/05-补充信息.md",
+      "dbt-mcp/pr/06-需求关系图.md",
+      "dbt-mcp/pr/说明.md"
+    ],
+    "structured_source": "dbt-mcp/pr/知识库.json"
+  },
+  "requirements": [
+    {
+      "id": "需求-02",
+      "title": "将 MetricFlow CLI 封装为 MCP 工具",
+      "project": "dbt-mcp",
+      "status": {
+        "bucket": "current",
+        "timeliness": "有效",
+        "implementation": "进行中"
+      },
+      "source": {
+        "index": "dbt-mcp/pr/01-当前有效需求索引.md",
+        "detail": "dbt-mcp/pr/需求/需求-02.md",
+        "structured": "dbt-mcp/pr/知识库.json"
+      },
+      "related_paths": [
+        "dbt-mcp/pr/需求/需求-02.md",
+        "dbt-mcp/src/dbt_mcp/metricflow/tools.py",
+        "dbt-mcp/tests"
+      ],
+      "acceptance": [],
+      "summary": "把 MetricFlow CLI 相关命令封装为 MCP 工具，并保持与 dbt CLI 风格一致。",
+      "first_proposed": null,
+      "last_confirmed": null,
+      "phase": "工具能力封装",
+      "notes": "补齐对 MetricFlow 的远程可调用能力。"
+    },
+    {
+      "id": "需求-03",
+      "title": "增加并调整 MetricFlow 项目文件工具",
+      "project": "dbt-mcp",
+      "status": {
+        "bucket": "current",
+        "timeliness": "有效",
+        "implementation": "进行中"
+      },
+      "source": {
+        "index": "dbt-mcp/pr/01-当前有效需求索引.md",
+        "detail": "dbt-mcp/pr/需求/需求-03.md",
+        "structured": "dbt-mcp/pr/知识库.json"
+      },
+      "related_paths": [
+        "dbt-mcp/pr/需求/需求-03.md"
+      ],
+      "acceptance": [],
+      "summary": "围绕读取、上传、删除 MetricFlow 项目文件形成独立工具集。",
+      "first_proposed": "2026-02-18",
+      "last_confirmed": "2026-02-19",
+      "phase": "工具能力封装",
+      "notes": "让上层流程可以直接操控项目文件。"
+    },
+    {
+      "id": "需求-04",
+      "title": "增强 MCP 工具描述与文档说明",
+      "project": "dbt-mcp",
+      "status": {
+        "bucket": "current",
+        "timeliness": "有效",
+        "implementation": "进行中"
+      },
+      "source": {
+        "index": "dbt-mcp/pr/01-当前有效需求索引.md",
+        "detail": "dbt-mcp/pr/需求/需求-04.md",
+        "structured": "dbt-mcp/pr/知识库.json"
+      },
+      "related_paths": [
+        "dbt-mcp/pr/需求/需求-04.md",
+        "dbt-mcp/README.md"
+      ],
+      "acceptance": [],
+      "summary": "让所有工具都具有分层 description、参数说明和本地/远程模式说明。",
+      "first_proposed": "2026-02-24",
+      "last_confirmed": "2026-02-24",
+      "phase": "工具能力封装",
+      "notes": "提升 MCP client 的可发现性与正确调用率。"
+    },
+    {
+      "id": "需求-05",
+      "title": "支持远程运行的 MCP 服务模式",
+      "project": "dbt-mcp",
+      "status": {
+        "bucket": "current",
+        "timeliness": "有效",
+        "implementation": "进行中"
+      },
+      "source": {
+        "index": "dbt-mcp/pr/01-当前有效需求索引.md",
+        "detail": "dbt-mcp/pr/需求/需求-05.md",
+        "structured": "dbt-mcp/pr/知识库.json"
+      },
+      "related_paths": [
+        "dbt-mcp/pr/需求/需求-05.md",
+        "dbt-mcp/README.md"
+      ],
+      "acceptance": [
+        "我把端口改成了 9092，然后在浏览器中访问 http://127.0.0.1:9092，显示服务器拒绝访问"
+      ],
+      "summary": "让 dbt-mcp 可以独立作为远程服务运行，并明确 transport、host、port 与 API Key 鉴权。",
+      "first_proposed": "2026-02-13",
+      "last_confirmed": "2026-02-13",
+      "phase": "远程服务模式与配置模型",
+      "notes": "支持被上层系统远程调用。"
+    },
+    {
+      "id": "需求-06",
+      "title": "重构项目根目录与 project_path 模型",
+      "project": "dbt-mcp",
+      "status": {
+        "bucket": "current",
+        "timeliness": "有效",
+        "implementation": "进行中"
+      },
+      "source": {
+        "index": "dbt-mcp/pr/01-当前有效需求索引.md",
+        "detail": "dbt-mcp/pr/需求/需求-06.md",
+        "structured": "dbt-mcp/pr/知识库.json"
+      },
+      "related_paths": [
+        "dbt-mcp/pr/需求/需求-06.md",
+        "dbt-mcp/tests"
+      ],
+      "acceptance": [],
+      "summary": "用 `DBT_PROJECT_ROOT_DIR + project_path` 管理多项目，而不是单项目路径。",
+      "first_proposed": "2026-02-17",
+      "last_confirmed": "2026-02-18",
+      "phase": "远程服务模式与配置模型",
+      "notes": "支持多项目并存和统一项目生命周期操作。"
+    },
+    {
+      "id": "需求-08",
+      "title": "修复测试、编码和运行时兼容性问题",
+      "project": "dbt-mcp",
+      "status": {
+        "bucket": "current",
+        "timeliness": "有效",
+        "implementation": "进行中"
+      },
+      "source": {
+        "index": "dbt-mcp/pr/01-当前有效需求索引.md",
+        "detail": "dbt-mcp/pr/需求/需求-08.md",
+        "structured": "dbt-mcp/pr/知识库.json"
+      },
+      "related_paths": [
+        "dbt-mcp/pr/需求/需求-08.md",
+        "dbt-mcp/tests"
+      ],
+      "acceptance": [],
+      "summary": "解决 pytest async、NameError、UnicodeDecodeError、旧安装版本与环境不一致等问题。",
+      "first_proposed": "2026-02-26",
+      "last_confirmed": "2026-02-26",
+      "phase": "测试、兼容性与运行期修复",
+      "notes": "让项目具备稳定的测试与运行基础。"
+    },
+    {
+      "id": "需求-01",
+      "title": "梳理 dbt CLI 封装结构与调用方式",
+      "project": "dbt-mcp",
+      "status": {
+        "bucket": "implemented",
+        "timeliness": "有效",
+        "implementation": "已落地"
+      },
+      "source": {
+        "index": "dbt-mcp/pr/02-已实现需求索引.md",
+        "detail": "dbt-mcp/pr/需求/需求-01.md",
+        "structured": "dbt-mcp/pr/知识库.json"
+      },
+      "related_paths": [
+        "dbt-mcp/pr/需求/需求-01.md",
+        "dbt-mcp/src/dbt_mcp/dbt_cli"
+      ],
+      "acceptance": [],
+      "summary": "理解项目如何封装 dbt CLI，并以此为基础扩展更多工具能力。",
+      "first_proposed": "2026-02-13",
+      "last_confirmed": "2026-02-13",
+      "phase": "工具能力封装",
+      "notes": "建立后续扩展 MetricFlow 工具的认知基础。"
+    },
+    {
+      "id": "需求-07",
+      "title": "明确环境变量模型与运行时加载行为",
+      "project": "dbt-mcp",
+      "status": {
+        "bucket": "implemented",
+        "timeliness": "有效",
+        "implementation": "已落地"
+      },
+      "source": {
+        "index": "dbt-mcp/pr/02-已实现需求索引.md",
+        "detail": "dbt-mcp/pr/需求/需求-07.md",
+        "structured": "dbt-mcp/pr/知识库.json"
+      },
+      "related_paths": [
+        "dbt-mcp/pr/需求/需求-07.md",
+        "dbt-mcp/README.md"
+      ],
+      "acceptance": [],
+      "summary": "梳理 `.env`、运行目录、工具集开关和本地/远程模式的实际加载方式。",
+      "first_proposed": "2026-02-13",
+      "last_confirmed": "2026-02-13",
+      "phase": "远程服务模式与配置模型",
+      "notes": "避免环境配置误判。"
+    }
+  ]
+}

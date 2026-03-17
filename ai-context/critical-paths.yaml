@@ -1,0 +1,90 @@
+schema_version: 1
+updated_at: 2026-03-17
+project: dbt-mcp
+
+entry_points:
+  - path: src/dbt_mcp/main.py
+    kind: runtime
+    role: MCP Server 主入口，负责配置加载和服务启动
+  - path: src/dbt_mcp/mcp/server.py
+    kind: runtime
+    role: FastMCP 服务装配入口
+  - path: scripts/doctor.sh
+    kind: validation
+    role: 最小环境、关键目录与环境变量模型检查入口
+  - path: scripts/smoke.sh
+    kind: validation
+    role: 默认 smoke 入口，通过 uv 执行最小 pytest
+  - path: pyproject.toml
+    kind: packaging
+    role: 包入口、依赖组与可执行脚本定义
+
+core_services:
+  - name: startup_and_config
+    paths:
+      - src/dbt_mcp/main.py
+      - src/dbt_mcp/config
+      - src/dbt_mcp/project_paths.py
+    responsibility: 配置解析、环境变量装配、多项目路径模型与启动前校验
+  - name: mcp_runtime
+    paths:
+      - src/dbt_mcp/mcp
+      - src/dbt_mcp/tools
+    responsibility: MCP 服务器装配、工具注册与运行时注入
+  - name: dbt_cli_and_metricflow_wrappers
+    paths:
+      - src/dbt_mcp/dbt_cli
+      - src/dbt_mcp/metricflow
+    responsibility: dbt CLI 与 MetricFlow CLI 的工具封装
+  - name: discovery_and_admin_clients
+    paths:
+      - src/dbt_mcp/discovery
+      - src/dbt_mcp/dbt_admin
+      - src/dbt_mcp/semantic_layer
+    responsibility: dbt Discovery、Admin API 和 Semantic Layer 访问
+
+high_risk_paths:
+  - path: src/dbt_mcp/config
+    reason: 直接决定 transport、host/port、API Key 与二进制路径解析
+  - path: src/dbt_mcp/project_paths.py
+    reason: 多项目根目录模型的核心，改动会影响项目发现与路径解析
+  - path: src/dbt_mcp/mcp
+    reason: 影响服务启动与运行时协议装配
+  - path: src/dbt_mcp/metricflow
+    reason: 直接影响 MetricFlow CLI 包装与配置行为
+  - path: pyproject.toml
+    reason: 依赖组合直接影响本地可用性与兼容性
+
+common_change_paths:
+  - path: src/dbt_mcp/config
+    reason: 多项目路径、transport 和环境变量相关需求常在这里推进
+  - path: src/dbt_mcp/metricflow
+    reason: MetricFlow CLI 包装与工具扩展主线常落在这里
+  - path: src/dbt_mcp/dbt_cli
+    reason: dbt CLI 工具封装和命令参数演化集中在这里
+  - path: tests
+    reason: 入口、配置与兼容性修复通常需要同步补测
+
+avoid_auto_change_paths:
+  - path: examples
+    reason: 面向外部 agent 的示例配置，不应在没有需求时自动调整
+  - path: pyproject.toml
+    reason: 依赖集合当前服务于兼容性修复主线，不适合无依据批量修改
+  - path: uv.lock
+    reason: 锁文件变更会放大依赖面影响，需结合明确兼容性目标处理
+  - path: ui
+    reason: 不属于当前 MCP 主链路核心，非明确需求不要顺手扩展
+
+verification_entrypoints:
+  - command: bash scripts/doctor.sh
+    status: 已验证
+    note: 2026-03-17 当前环境执行通过
+  - command: bash scripts/smoke.sh
+    status: 已验证
+    note: 2026-03-17 当前环境执行通过，4 passed, 19 warnings
+  - command: dbt-mcp
+    status: 未验证
+    note: 完整 MCP Server 启动入口
+  - command: pytest
+    status: 未验证
+    note: 完整测试入口
